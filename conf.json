@@ -1,0 +1,11 @@
+{
+  "IsDevelopment": false,
+  "ExecutionPolicy": "Unrestricted",
+  "ErrorActionPreference": "Continue",
+  "VerbosePreference": "SilentlyContinue",
+  "WarningPreference": "SilentlyContinue",
+  "ErrorView": "NormalView",
+  "Depth": 4,
+  "DateTimeLogFormat": "yyyy-MM-dd HH:mm:ss",
+  "Path": {}
+}

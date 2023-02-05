@@ -1,0 +1,8 @@
+.vs
+bin
+obj
+Properties
+_wrappers/_*
+_wrappers/test*
+_scripts/_*
+_scripts/test*

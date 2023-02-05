@@ -1,0 +1,22 @@
+stages:
+  - deploy
+
+deploy_to_repository:
+  stage: deploy
+  only:
+    - main
+  script: 
+   - chcp 65001
+   - whoami.exe
+   - New-Object -TypeName PSCustomObject -Property $PSVersionTable | ft PSVersion,PSEdition,OS
+   - (Get-Date).ToString('o')
+   - $Location = Get-Location
+   - try {dotnet.exe publish --configuration PublishRelease} catch {throw $_.Exception}
+   - Import-Module IISAdministration
+   - Get-IISSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
+   - Stop-IISSite -Name 'PowerShellWebService' -Confirm:$false -Passthru | ft Id,Name,State,Bindings
+   - try {Copy-Item -Force -Recurse -Path "$Location\bin\PublishRelease\net7.0\*" -Destination 'C:\inetpub\PowerShellWebService\'} catch {Write-Warning $_.Exception}
+   - Start-IISSite -Name 'PowerShellWebService' -Passthru | ft Id,Name,State,Bindings
+   - (Get-Date).ToString('o')
+  tags: 
+    - APP
