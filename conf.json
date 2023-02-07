@@ -7,5 +7,8 @@
   "ErrorView": "NormalView",
   "Depth": 4,
   "DateTimeLogFormat": "yyyy-MM-dd HH:mm:ss",
-  "Path": {}
+  "Path": {
+    "Wrappers": ".\\_wrappers",
+    "Scripts": ".\\_scripts"
+  }
 }
