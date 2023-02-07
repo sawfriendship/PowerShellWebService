@@ -15,7 +15,7 @@ deploy_to_repository:
    - Import-Module IISAdministration
    - Get-IISSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
    - Stop-IISSite -Name 'PowerShellWebService' -Confirm:$false -Passthru | ft Id,Name,State,Bindings
-   - try {Copy-Item -Force -Recurse -Path "$Location\bin\PublishRelease\net7.0\*" -Destination 'C:\inetpub\PowerShellWebService\'} catch {Write-Warning $_.Exception}
+   - try {Copy-Item -Force -Recurse -Path "$Location\bin\PublishRelease\net7.0\publish\*" -Destination 'C:\inetpub\PowerShellWebService\'} catch {Write-Warning $_.Exception}
    - Start-IISSite -Name 'PowerShellWebService' -Passthru | ft Id,Name,State,Bindings
    - (Get-Date).ToString('o')
   tags: 
