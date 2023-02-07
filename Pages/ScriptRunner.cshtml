@@ -6,26 +6,33 @@
 <h1>@ViewData["Title"]</h1>
 <br>
 <div id="Param" class="input-group" style="display:none">
-    <input name="Property" type="text" aria-label="Name" placeholder="Name" class="form-control param_prop">
-    <input name="Value" type="text" aria-label="Value" placeholder="Value" class="form-control param_prop">
-    <select name="Type" class="form-select param_prop">
+    <select style="max-width:90px" name="Type" class="form-select param_prop">
         <option value="String">String</option>
         <option value="Number">Number</option>
         <option value="Bool">Bool</option>
         <option value="Object">Object</option>
     </select>
-    <button class="btn btn-outline-dark _btn_del_param" type="button">Del</button>
+    <input name="Property" type="text" aria-label="Name" placeholder="Name" class="form-control param_prop">
+    <input name="Value" type="text" aria-label="Value" placeholder="Value" class="form-control param_prop">
+    <button class="btn btn-outline-dark _btn_del_param" type="button"><i class="bi-trash3"></i></button>
 </div>
 
 <div class="container">
-    <div class="row">
+    <div class="row row-cols-2">
         <!-- LEFT -->
-        <div id="LEFT" class="col-sm-5 col-md-4" style="z-index:2">
+        <div id="LEFT" class="col-sm-5 col-md-4 col-xs-4" style="z-index:2">
             <div class="mb-3">
-                <label for="_script" class="form-label">Script</label>
+                @* <label for="_wrapper" class="form-label">Wrapper</label>
                 <input type="text" class="form-control" id="_wrapper" placeholder="Wrapper" value="ExampleWrapper">
                 <label for="_script" class="form-label">Script</label>
-                <input type="text" class="form-control" id="_script" placeholder="Script" value="ExampleScript">
+                <input type="text" class="form-control" id="_script" placeholder="Script" value="ExampleScript"> *@
+
+                <label for="_wrapper" class="form-label">Wrapper</label>
+                <select id="_wrapper" name="Property" class="form-select"></select>
+
+                <label for="_script" class="form-label">Script</label>
+                <select id="_script" name="Value" class="form-select"></select>
+            
             </div>
             <div class="mb-3">
                 <span>Params</span>
@@ -35,13 +42,13 @@
             <div id="Params"></div>
         </div>
         <!-- RIGHT -->
-        <div id="RIGHT" class="col-sm-5 offset-sm-2 col-md-8 offset-md-0 border border-2" style="z-index:1">
+        <div id="RIGHT" class="col-sm-5 offset-sm-2 col-md-8 offset-md-0 col-xs-8 border border-2" style="z-index:1">
             <div class="mb-3">
                 <label for="_body" class="form-label">Body</label>
                 <input id="_body" class="form-control bg-dark text-light" placeholder="Body">
                 <a id="pwsh_url" target="_blank" href=""></a>
             </div>
-            <div id="Result" class="mb-3">
+            <div class="mb-3">
                 <div id="SendParam" class="input-group">
                     <span class="input-group-text">Depth</span>
                     <input name="Depth" type="number" aria-label="Depth" placeholder="Depth" value="4" class="form-control _depth">
@@ -62,7 +69,10 @@
                 </div>
                     <br>
                 <label for="_result" class="form-label">Result</label>
-                <textarea id="_result" class="form-control bg-dark text-light border border-4 rounded rounded-5" rows="20" placeholder="Result"></textarea>
+                <div id="Result" class="mb-3">
+                    <textarea id="_result" class="form-control bg-dark text-light border border-4 rounded rounded-5" rows="20" placeholder="Result" readonly></textarea>
+                    <span class="btn btn-outline-light _btn_copy"><i class="bi bi-clipboard"></i></span>
+                </div>
             </div>
         </div>
 

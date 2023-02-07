@@ -8,10 +8,6 @@ html {
   }
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #197ae3;
-}
-
 html {
   position: relative;
   min-height: 100%;
@@ -26,12 +22,13 @@ input, select, button, span {
   margin-bottom: 4px;
 }
 
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+}
+
 #LEFT {
   z-index:1;
   padding: 25px;
-  /* border-color: rgba(0, 0, 0, 0.8);
-  border-width: 2px;
-  box-shadow: 0 1px 1px rgba(229, 103, 23, 0.075) inset, 0 0 8px rgba(0, 0, 0, 0.7); */
 }
 #RIGHT {
   z-index:1000;
@@ -62,3 +59,12 @@ input, select, button, span {
   border-color: rgba(var(--bs-danger-rgb), var(--bs-border-opacity)) !important;
 }
 
+#Result {
+  position: relative;
+}
+
+._btn_copy {
+  position: absolute; 
+  top: 10px; 
+  right: 10px;
+}

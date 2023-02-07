@@ -55,7 +55,74 @@ app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, 
     }
 );
 
-string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> Query, string Body, int Depth, HttpContext Context) {
+app.Map("/PowerShell/", async (HttpContext Context) =>
+    {
+        Context.Response.Headers["Content-Type"] = "application/json; charset=utf-8";
+        OrderedDictionary ResultTable = new OrderedDictionary();
+        List<String> WrapperList = new List<String>();
+        List<String> ScriptList = new List<String>();
+
+        bool success = true;
+        string error = "";
+
+        try
+        {
+            if (Directory.Exists(ScriptDir))
+            {
+                var ScriptDirInfo = new DirectoryInfo(ScriptDir);
+                FileInfo[] Files = ScriptDirInfo.GetFiles("*.ps1");
+                foreach (FileInfo File_ in Files)
+                {
+                    ScriptList.Add(File_.Name.Replace(File_.Extension, ""));
+                }
+            }
+            else
+            {
+                success = false;
+                error = $"Directory {ScriptDir} not found";
+            }
+        }
+        catch (Exception e)
+        {
+            success = false;
+            error = e.ToString();
+        }
+
+        try
+        {
+            if (Directory.Exists(WrapperDir))
+            {
+                var WrapperDirInfo = new DirectoryInfo(WrapperDir);
+                FileInfo[] Files = WrapperDirInfo.GetFiles("*.ps1");
+                foreach (FileInfo File_ in Files)
+                {
+                    WrapperList.Add(File_.Name.Replace(File_.Extension, ""));
+                }
+            }
+            else
+            {
+                success = false;
+                error = $"Directory {WrapperDir} not found";
+            }
+        }
+        catch (Exception e)
+        {
+            success = false;
+            error = e.ToString();
+        }
+        ResultTable["Success"] = success;
+        ResultTable["Error"] = error;
+        ResultTable["Wrappers"] = WrapperList;
+        ResultTable["Scripts"] = ScriptList;
+
+        JsonObject.ConvertToJsonContext jsonContext = new JsonObject.ConvertToJsonContext(maxDepth: 4, enumsAsStrings: false, compressOutput: false);
+        string OutputString = JsonObject.ConvertToJson(ResultTable, jsonContext);
+        await Context.Response.WriteAsync(OutputString);
+    }
+);
+
+string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> Query, string Body, int Depth, HttpContext Context)
+{
     var PSObjects = new Collection<PSObject>();
     OrderedDictionary ResultTable = new OrderedDictionary();
     OrderedDictionary Streams = new OrderedDictionary();
@@ -71,7 +138,7 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
     {
 
         InitialSessionState initialSessionState = InitialSessionState.CreateDefault();
-        string conf_ExecPol = WebAppConfig.GetValue("ExecutionPolicy","Unrestricted")!;
+        string conf_ExecPol = WebAppConfig.GetValue("ExecutionPolicy", "Unrestricted")!;
         var ExecPol = Enum.Parse(typeof(ExecutionPolicy), conf_ExecPol);
         initialSessionState.ExecutionPolicy = (ExecutionPolicy)ExecPol;
 

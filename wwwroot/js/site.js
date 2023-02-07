@@ -1,6 +1,28 @@
 ﻿// Please see documentation at https://docs.microsoft.com/aspnet/core/client-side/bundling-and-minification
 // for details on configuring this project to bundle and minify static web assets.
 
+function load_scripts() {
+    var request = {
+        url: '/PowerShell/',
+        method: 'GET',
+        contentType: 'application/json; charset=utf-8',
+        success: function(responce){
+            console.log(responce)
+            for (var i in responce.Wrappers) {$(`<option value="${responce.Wrappers[i]}">${responce.Wrappers[i]}</option>`).appendTo('#_wrapper')}
+            for (var i in responce.Scripts) {$(`<option value="${responce.Scripts[i]}">${responce.Scripts[i]}</option>`).appendTo('#_script')}
+            update_url()
+        },
+        error: function(responce){
+        }
+    }
+
+    $.ajax(request);
+}
+
+function write_to_clip() {
+    navigator.clipboard.writeText($('#_result').val())
+}
+
 function put_to_body() {
     var result = {};
     $('#Params').children().each(function(){
@@ -39,12 +61,13 @@ function update_url() {
     var wrapper = $('#_wrapper').val()
     var script = $('#_script').val()
     var url = `/PowerShell/${wrapper}/${script}`
-    $('a#pwsh_url').attr('href',url)
+    $('a#pwsh_url').prop('href',url)
     $('a#pwsh_url').html(url)
     console.log(url)
 }
 
 function send_body() {
+    $('._btn_send').addClass('disabled')
     var method = $(this).attr('method')
     var depth = $('._depth').val()
     var outputtype = $('._outputtype').val()
@@ -56,6 +79,7 @@ function send_body() {
         method: method,
         headers: {Depth:depth},
         success: function(responce){
+            $('._btn_send').removeClass('disabled')
             console.log(url,method,responce)
             if (outputtype == 'Raw') {var result = responce
             } else if (outputtype == 'Streams') {var result = responce.Streams
@@ -66,7 +90,7 @@ function send_body() {
             } else if (outputtype == 'Information') {var result = responce.Streams.Information
             } else if (outputtype == 'Debug') {var result = responce.Streams.Debug
             } else {}
-            var result_string = JSON.stringify(result)
+            var result_string = JSON.stringify(result, null, 2)
             $('#_result').val(result_string)
             if (!responce.Success || responce.Error || responce.Streams.HadErrors){
                 $('#_result').removeClass('border-success _result_success').addClass('border-danger _result_error')
@@ -75,6 +99,7 @@ function send_body() {
             }
         },
         error: function(responce){
+            $('._btn_send').removeClass('disabled')
             $('#_result').removeClass('border-success _result_success').addClass('border-danger _result_error')
         }
     }
@@ -88,16 +113,19 @@ function send_body() {
     }
 
     $.ajax(request);
-} 
+}
+
+
 
 $( document ).ready(function() {
-    update_url();
+    load_scripts();
     $('#_wrapper').bind('click keyup', update_url);
     $('#_script').bind('click keyup', update_url);
     $('#Params').bind('click keyup', put_to_body);
     $('._btn_add_param').bind('click', add_param);
     $('._btn_del_param').bind('click', del_param);
     $('._btn_send').bind('click', send_body);
+    $('._btn_copy').bind('click', write_to_clip);
 
 });
 
