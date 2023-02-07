@@ -9,7 +9,7 @@ html {
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #197ae3;
 }
 
 html {
@@ -19,4 +19,46 @@ html {
 
 body {
   margin-bottom: 60px;
+  background-color: #eeeeee;
 }
+
+input, select, button, span {
+  margin-bottom: 4px;
+}
+
+#LEFT {
+  z-index:1;
+  padding: 25px;
+  /* border-color: rgba(0, 0, 0, 0.8);
+  border-width: 2px;
+  box-shadow: 0 1px 1px rgba(229, 103, 23, 0.075) inset, 0 0 8px rgba(0, 0, 0, 0.7); */
+}
+#RIGHT {
+  z-index:1000;
+  padding: 25px;
+  border-color: rgba(0, 0, 0, 0.8);
+  border-width: 1px;
+  box-shadow: 0 1px 1px rgba(229, 103, 23, 0.075) inset, 0 0 8px rgba(0, 0, 0, 0.7);
+}
+
+._result_error {
+  border-color: rgba(255, 0, 0, 0.8);
+  border-width: 3px;
+  box-shadow: 0 1px 2px rgba(229, 103, 23, 0.075) inset, 0 0 8px rgba(255, 0, 0, 0.7);
+}
+
+._result_success {
+  border-color: rgba(0, 255, 0, 0.8);
+  border-width: 3px;
+  box-shadow: 0 1px 2px rgba(103, 229, 23, 0.075) inset, 0 0 8px rgba(0, 255, 0, 0.7);
+}
+
+.border-success {
+  --bs-border-opacity: 1;
+  border-color: rgba(var(--bs-success-rgb), var(--bs-border-opacity)) !important;
+}
+.border-danger {
+  --bs-border-opacity: 1;
+  border-color: rgba(var(--bs-danger-rgb), var(--bs-border-opacity)) !important;
+}
+
