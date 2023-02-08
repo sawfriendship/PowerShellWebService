@@ -19,8 +19,24 @@ function load_scripts() {
     $.ajax(request);
 }
 
-function write_to_clip() {
-    navigator.clipboard.writeText($('#_result').val())
+function ani_send(d) {
+    $({num: 0}).animate({num: 80}, {
+        duration: d,
+        easing: "swing",
+        step: function(val) {
+            int_val = Math.ceil(val)
+            $('#_result').css('background',`linear-gradient(60deg, rgb(0,0,0), rgb(${int_val},${int_val},${int_val}), rgb(0,0,0))`);
+        }
+    });
+
+    $({num: 80}).animate({num: 0}, {
+        duration: d,
+        easing: "swing",
+        step: function(val) {
+            int_val = Math.ceil(val)
+            $('#_result').css('background',`linear-gradient(60deg, rgb(0,0,0), rgb(${int_val},${int_val},${int_val}), rgb(0,0,0))`);
+        }
+    });
 }
 
 function put_to_body() {
@@ -54,7 +70,6 @@ function add_param() {
 
 function del_param() {
     $(this).parent().hide(200, function(){ $(this).remove(); put_to_body();});
-    
 }
 
 function update_url() {
@@ -68,6 +83,9 @@ function update_url() {
 
 function send_body() {
     $('._btn_send').addClass('disabled')
+    $('#_result').addClass('processing')
+    $('#_result').removeClass('border-success _result_success border-danger _result_error')
+    ani_send(200);
     var method = $(this).attr('method')
     var depth = $('._depth').val()
     var outputtype = $('._outputtype').val()
@@ -80,6 +98,7 @@ function send_body() {
         headers: {Depth:depth},
         success: function(responce){
             $('._btn_send').removeClass('disabled')
+            $('#_result').removeClass('processing')
             console.log(url,method,responce)
             if (outputtype == 'Raw') {var result = responce
             } else if (outputtype == 'Streams') {var result = responce.Streams
@@ -91,16 +110,19 @@ function send_body() {
             } else if (outputtype == 'Debug') {var result = responce.Streams.Debug
             } else {}
             var result_string = JSON.stringify(result, null, 2)
-            $('#_result').val(result_string)
+            $('#_result ').val(result_string)
             if (!responce.Success || responce.Error || responce.Streams.HadErrors){
                 $('#_result').removeClass('border-success _result_success').addClass('border-danger _result_error')
             } else {
                 $('#_result').removeClass('border-danger _result_error').addClass('border-success _result_success')
             }
+            ani_send(200);
         },
         error: function(responce){
             $('._btn_send').removeClass('disabled')
+            $('#_result').removeClass('processing')
             $('#_result').removeClass('border-success _result_success').addClass('border-danger _result_error')
+            ani_send(200);
         }
     }
 
@@ -115,6 +137,9 @@ function send_body() {
     $.ajax(request);
 }
 
+function write_to_clip() {
+    navigator.clipboard.writeText($('#_result').val())
+}
 
 
 $( document ).ready(function() {
@@ -126,6 +151,4 @@ $( document ).ready(function() {
     $('._btn_del_param').bind('click', del_param);
     $('._btn_send').bind('click', send_body);
     $('._btn_copy').bind('click', write_to_clip);
-
 });
-
