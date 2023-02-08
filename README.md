@@ -33,9 +33,9 @@ See "Output Streams" below
 
 ### Run
 
-- ![img_get_version](https://github.com/sawfriendship/PowerShellWebService/raw/main/img/2023-02-08_13-21-10.png)
-- ![img_post_params](https://github.com/sawfriendship/PowerShellWebService/raw/main/img/2023-02-08_13-19-14.png)
-- ![img_error](https://github.com/sawfriendship/PowerShellWebService/raw/main/img/2023-02-08_13-23-50.png)
+![img_get_version](https://github.com/sawfriendship/PowerShellWebService/raw/main/img/2023-02-08_13-21-10.png =350x)
+![img_post_params](https://github.com/sawfriendship/PowerShellWebService/raw/main/img/2023-02-08_13-19-14.png =350x)
+![img_error](https://github.com/sawfriendship/PowerShellWebService/raw/main/img/2023-02-08_13-23-50.png =350x)
 
 ### Links
 
