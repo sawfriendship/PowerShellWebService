@@ -25,7 +25,7 @@ Check conf.json file
 This service is designed to work as an internal service on a web server to simplify data exchange with PowerShell.
 
 It is very simple because it is intended for those who find it difficult to understand C#, but knows other languages and wants to get the power of PowerShell.
-***It's not worth publishing it for users! Instead, publish it to the address 127.0.0.1 or any other 127.0.0.*, if we are talking about Windows, yes, you can do that there :-)***
+### It's not worth publishing it for users! Instead, publish it to the address 127.0.0.1 or any other 127.0.0.*, if we are talking about Windows, yes, you can do that there :-)
 
 After that, you can write a web service in your favorite language and use PowerShell Web Service inside it, it can be Go, Python, PHP, Perl, Java, JavaScript or something else at your discretion.
 And please don't run any more PowerShell.exe and disassemble stdout, because it has 6 output streams under the hood instead of 2 and you can skip the most interesting :-)
