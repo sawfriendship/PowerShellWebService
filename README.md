@@ -6,8 +6,9 @@ Install [.NET 7.0 SDK (v7.0.102) - Windows x64](https://dotnet.microsoft.com/en-
 
 Install [PowerShell 7](https://github.com/PowerShell/PowerShell/releases)
 
-**Check settings in conf.json file**
+### Check settings in conf.json file
 
+**Publish and run**
 ```
 cd <ProjectPath>
 dotnet.exe publish --configuration PublishRelease
@@ -15,8 +16,87 @@ cd <ProjectPath>\bin\PublishRelease\net7.0\publish\
 PowerShellWebService.exe
 ```
 
+**self-contained Publish for Windows**
+```
+cd <ProjectPath>
+dotnet publish --configuration PublishRelease --self-contained --runtime win10-x64
+cd <ProjectPath>\bin\PublishRelease\net7.0\publish\win10-x64\
+```
+**self-contained Publish for Linux**
+```
+cd <ProjectPath>
+dotnet publish --configuration PublishRelease --self-contained --runtime ubuntu.14.04-x64
+cd <ProjectPath>\bin\PublishRelease\net7.0\publish\ubuntu.14.04-x64\
+```
+
+
+
 ## Usage
-Check conf.json file
+
+**Python example GET request**
+``` python
+import requests, json, urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+POWERSHELL_WEBSERVICE_URL = 'http://127.0.0.1:81/PowerShell'
+wrapper = 'ExampleWrapper'
+script = 'Date'
+param = dict(
+    verify = False,
+    method='GET',
+    url = f"{POWERSHELL_WEBSERVICE_URL}/{wrapper}/{script}",
+    headers = {'User-Agent':'pyapi','Depth':'3'},
+)
+
+responce = requests.request(**param).json()
+
+result = dict(success = True, error = "", data = None,)
+if responce.get('Success',False): # Net.CoreRuntime level (bool)
+    streams = responce.get('Streams',{})
+    if streams:
+        had_errors = streams.get('HadErrors',False) # PowerShell level (bool)
+        if had_errors:
+            errors = streams.get('Errors',[])
+            if errors:
+                result['success'] = False
+                result['error'] = errors
+        else:
+            psobjects = streams.get('PSObjects',[])
+            if psobjects:
+                result['data'] = psobjects
+print(result)
+```
+**Python example POST request**
+``` python
+import requests, json, urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+POWERSHELL_WEBSERVICE_URL = 'http://127.0.0.1:81/PowerShell'
+wrapper = 'ExampleWrapper'
+script = 'Date'
+param = dict(
+    verify = False,
+    method='POST',
+    url = f"{POWERSHELL_WEBSERVICE_URL}/{wrapper}/{script}",
+    headers = {'User-Agent':'pyapi','Depth':'3'},
+)
+
+responce = requests.request(**param, json={'Year':1900,'Month':1,'Day':1}).json()
+
+result = dict(success = True, error = "", data = None,)
+if responce.get('Success',False): # Net.CoreRuntime level (bool)
+    streams = responce.get('Streams',{})
+    if streams:
+        had_errors = streams.get('HadErrors',False) # PowerShell level (bool)
+        if had_errors:
+            errors = streams.get('Errors',[])
+            if errors:
+                result['success'] = False
+                result['error'] = errors
+        else:
+            psobjects = streams.get('PSObjects',[])
+            if psobjects:
+                result['data'] = psobjects
+print(result)
+```
 
 ***
 
