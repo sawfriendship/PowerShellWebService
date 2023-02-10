@@ -6,6 +6,8 @@
   "WarningPreference": "SilentlyContinue",
   "ErrorView": "NormalView",
   "Depth": 4,
+  "FormatEnumerationLimit": 10,
+  "OFS": ",",
   "DateTimeLogFormat": "yyyy-MM-dd HH:mm:ss",
   "Path": {
     "Wrappers": ".\\_wrappers",

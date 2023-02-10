@@ -18,7 +18,7 @@ var WebAppBuilder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(ar
 WebAppBuilder.Logging.AddJsonConsole();
 WebAppBuilder.Services.AddRazorPages();
 await using var app = WebAppBuilder.Build();
-var WebAppConfig = new ConfigurationBuilder().AddJsonFile("conf.json", optional: true, reloadOnChange: true).Build();
+var WebAppConfig = new ConfigurationBuilder().AddJsonFile("_config.json", optional: true, reloadOnChange: true).Build();
 
 bool IsDevelopment = WebAppConfig.GetValue("IsDevelopment", false)!;
 string DateTimeLogFormat = WebAppConfig.GetValue("DateTimeLogFormat", "yyyy-MM-dd HH:mm:ss")!;
@@ -149,6 +149,8 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         PSRunspace.SessionStateProxy.SetVariable("VerbosePreference", WebAppConfig.GetValue("VerbosePreference", "SilentlyContinue"));
         PSRunspace.SessionStateProxy.SetVariable("WarningPreference", WebAppConfig.GetValue("WarningPreference", "SilentlyContinue"));
         PSRunspace.SessionStateProxy.SetVariable("ErrorView", WebAppConfig.GetValue("ErrorView", "NormalView"));
+        PSRunspace.SessionStateProxy.SetVariable("FormatEnumerationLimit", WebAppConfig.GetValue("FormatEnumerationLimit", 10));
+        PSRunspace.SessionStateProxy.SetVariable("OFS", WebAppConfig.GetValue("OFS", ","));
 
         PowerShell PwSh = PowerShell.Create();
         PwSh.Runspace = PSRunspace;
