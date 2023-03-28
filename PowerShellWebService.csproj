@@ -8,6 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+	<None Update="_scripts\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
+	<None Update="_wrappers\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
+	<None Update="wwwroot\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
+  </ItemGroup>
+
+  <ItemGroup>
+
   <!-- Minimal
     <Reference Include="Microsoft.PowerShell.Commands.Diagnostics"> <HintPath>C:\Program Files\PowerShell\7\Microsoft.PowerShell.Commands.Diagnostics.dll</HintPath> </Reference>
     <Reference Include="Microsoft.PowerShell.Commands.Management"> <HintPath>C:\Program Files\PowerShell\7\Microsoft.PowerShell.Commands.Management.dll</HintPath> </Reference>
@@ -258,18 +265,6 @@
 	<Reference Include="System.Xml.XPath.XDocument"><HintPath>C:\Program Files\PowerShell\7\System.Xml.XPath.XDocument.dll</HintPath></Reference>
 	<Reference Include="WindowsBase"><HintPath>C:\Program Files\PowerShell\7\WindowsBase.dll</HintPath></Reference>
 	<Reference Include="WindowsFormsIntegration"><HintPath>C:\Program Files\PowerShell\7\WindowsFormsIntegration.dll</HintPath></Reference>
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="_scripts\*">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="_wrappers\*">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="wwwroot\*">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 
 </Project>

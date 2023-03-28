@@ -2,6 +2,8 @@
 bin
 obj
 Properties
+*.bak
+*.dib
 _wrappers/_*
 _wrappers/test*
 _scripts/_*

@@ -1,16 +1,19 @@
 using System;
 using System.IO;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Configuration;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Collections.ObjectModel;
 using Microsoft.PowerShell;
 using Microsoft.PowerShell.Commands;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using Microsoft.Extensions.Logging;
-using System.Collections.ObjectModel;
+using System.Reflection;
 
 string ROOT_DIR = AppContext.BaseDirectory;
 var WebAppBuilder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
@@ -126,6 +129,7 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
     var PSObjects = new Collection<PSObject>();
     OrderedDictionary ResultTable = new OrderedDictionary();
     OrderedDictionary Streams = new OrderedDictionary();
+    OrderedDictionary StateInfo = new OrderedDictionary();
 
     bool success = true;
     string error = "";
@@ -136,18 +140,17 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
 
     if (File.Exists(WrapperFile) && File.Exists(ScriptFile))
     {
-
-        InitialSessionState initialSessionState = InitialSessionState.CreateDefault();
+        var initialSessionState = System.Management.Automation.Runspaces.InitialSessionState.CreateDefault();
         string conf_ExecPol = WebAppConfig.GetValue("ExecutionPolicy", "Unrestricted")!;
         var ExecPol = Enum.Parse(typeof(ExecutionPolicy), conf_ExecPol);
         initialSessionState.ExecutionPolicy = (ExecutionPolicy)ExecPol;
-
-        Runspace PSRunspace = RunspaceFactory.CreateRunspace(initialSessionState);
+        var PSRunspace = System.Management.Automation.Runspaces.RunspaceFactory.CreateRunspace(initialSessionState);
         PSRunspace.Open();
 
         PSRunspace.SessionStateProxy.SetVariable("ErrorActionPreference", WebAppConfig.GetValue("ErrorActionPreference", "SilentlyContinue"));
         PSRunspace.SessionStateProxy.SetVariable("VerbosePreference", WebAppConfig.GetValue("VerbosePreference", "SilentlyContinue"));
         PSRunspace.SessionStateProxy.SetVariable("WarningPreference", WebAppConfig.GetValue("WarningPreference", "SilentlyContinue"));
+        PSRunspace.SessionStateProxy.SetVariable("DebugPreference", WebAppConfig.GetValue("DebugPreference", "SilentlyContinue"));
         PSRunspace.SessionStateProxy.SetVariable("ErrorView", WebAppConfig.GetValue("ErrorView", "NormalView"));
         PSRunspace.SessionStateProxy.SetVariable("FormatEnumerationLimit", WebAppConfig.GetValue("FormatEnumerationLimit", 10));
         PSRunspace.SessionStateProxy.SetVariable("OFS", WebAppConfig.GetValue("OFS", ","));
@@ -164,28 +167,90 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         try
         {
             PSObjects = PwSh.Invoke();
+
             Streams.Add("PSObjects", PSObjects);
             Streams.Add("HadErrors", PwSh.HadErrors);
-            Streams.Add("Error", PwSh.Streams.Error);
-            Streams.Add("Warning", PwSh.Streams.Warning);
-            Streams.Add("Verbose", PwSh.Streams.Verbose);
-            Streams.Add("Debug", PwSh.Streams.Debug);
-            Streams.Add("Information", PwSh.Streams.Information);
+            
+            var ErrorList = new List<Object>();
+            var WarningList = new List<Object>();
+            var VerboseList = new List<Object>();
+            var InformationList = new List<Object>();
+
+            foreach (var Stream in PwSh.Streams.Error) {
+                var StreamDictionary = new Dictionary<String, Object>();
+                var InvocationInfo = Stream.InvocationInfo;
+                var ExceptionInfo = Stream.Exception;
+                var NewExceptionInfo = new Dictionary<String, Object>();
+                var NewInvocationInfo = new Dictionary<String, Object>();
+                NewInvocationInfo["ScriptName"] = $"{InvocationInfo.ScriptName}";
+                NewInvocationInfo["ScriptLineNumber"] = InvocationInfo.ScriptLineNumber;
+                NewInvocationInfo["Line"] = InvocationInfo.Line;
+                NewInvocationInfo["PositionMessage"] = $"{InvocationInfo.PositionMessage}";
+                NewInvocationInfo["PipelineLength"] = $"{InvocationInfo.PipelineLength}";
+                NewInvocationInfo["PipelinePosition"] = $"{InvocationInfo.PipelinePosition}";
+                NewExceptionInfo["Message"] = $"{ExceptionInfo.Message}";
+                NewExceptionInfo["Source"] = $"{ExceptionInfo.Source}";
+                StreamDictionary["Exception"] = NewExceptionInfo;
+                StreamDictionary["InvocationInfo"] = NewInvocationInfo;
+                StreamDictionary["TargetObject"] = $"{Stream.TargetObject}";
+                StreamDictionary["FullyQualifiedErrorId"] = $"{Stream.FullyQualifiedErrorId}";
+                ErrorList.Add(StreamDictionary);
+            }
+
+            foreach (var Stream in PwSh.Streams.Warning) {
+                var StreamDictionary = new Dictionary<String, Object>();
+                var NewInvocationInfo = new Dictionary<String, Object>();
+                var InvocationInfo = Stream.InvocationInfo;
+                NewInvocationInfo["Source"] = $"{InvocationInfo.MyCommand.Source}";
+                NewInvocationInfo["PositionMessage"] = $"{InvocationInfo.PositionMessage}";
+                StreamDictionary["Message"] = Stream.Message;
+                StreamDictionary["InvocationInfo"] = NewInvocationInfo;
+                WarningList.Add(StreamDictionary);
+            }
+
+            foreach (var Stream in PwSh.Streams.Verbose) {
+                var StreamDictionary = new Dictionary<String, Object>();
+                var NewInvocationInfo = new Dictionary<String, Object>();
+                var InvocationInfo = Stream.InvocationInfo;
+                NewInvocationInfo["Source"] = $"{InvocationInfo.MyCommand.Source}";
+                NewInvocationInfo["PositionMessage"] = $"{InvocationInfo.PositionMessage}";
+                StreamDictionary["Message"] = Stream.Message;
+                StreamDictionary["InvocationInfo"] = NewInvocationInfo;
+                VerboseList.Add(StreamDictionary);
+            }
+
+            foreach (var Stream in PwSh.Streams.Information) {
+                var StreamDictionary = new Dictionary<String, Object>();
+                StreamDictionary["Source"] = $"{Stream.Source}";
+                StreamDictionary["TimeGenerated"] = $"{Stream.TimeGenerated}";
+                StreamDictionary["MessageData"] = Stream.MessageData;
+                InformationList.Add(StreamDictionary);
+            }
+
+            Streams["Error"] = ErrorList;
+            Streams["Warning"] = WarningList;
+            Streams["Verbose"] = VerboseList;
+            Streams["Information"] = InformationList;
+            Streams["Debug"] = PwSh.Streams.Debug;
+            
+            StateInfo["State"] = $"{PwSh.InvocationStateInfo.State}";
+            StateInfo["StateCode"] = PwSh.InvocationStateInfo.State;
+            StateInfo["Reason"] = $"{PwSh.InvocationStateInfo.Reason}";
         }
         catch (Exception e)
         {
-            error = e.ToString();
+            error = $"{e.Message}";
             success = false;
         }
 
         try
         {
             PwSh.Runspace.Close();
-            app.Logger.LogInformation($"RunspaceStateInfo:{PwSh.Runspace.RunspaceStateInfo.State.ToString()}");
+            app.Logger.LogInformation($"RunspaceStateInfo:{PwSh.Runspace.RunspaceStateInfo.State}");
         }
         catch
         {
-            app.Logger.LogError($"RunspaceStateInfo:{PwSh.Runspace.RunspaceStateInfo.State.ToString()}");
+            app.Logger.LogError($"RunspaceStateInfo:{PwSh.Runspace.RunspaceStateInfo.State}");
         }
 
     }
@@ -218,18 +283,20 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
 
     try
     {
-        ResultTable.Add("Success", success);
-        ResultTable.Add("Error", error);
-        ResultTable.Add("Streams", Streams);
+        ResultTable["Success"] = success;
+        ResultTable["Error"] = error;
+        ResultTable["Streams"] = Streams;
+        ResultTable["InvocationStateInfo"] = StateInfo;
         JsonObject.ConvertToJsonContext jsonContext = new JsonObject.ConvertToJsonContext(maxDepth: Depth, enumsAsStrings: false, compressOutput: false);
         PSOutputString = JsonObject.ConvertToJson(ResultTable, jsonContext);
     }
     catch (Exception e)
     {
         Streams.Clear();
-        ResultTable["Streams"] = Streams;
         ResultTable["Success"] = false;
         ResultTable["Error"] = $"JSON serialization error: {e.ToString()}";
+        ResultTable["Streams"] = Streams;
+        ResultTable["InvocationStateInfo"] = StateInfo;
         JsonObject.ConvertToJsonContext jsonContext = new JsonObject.ConvertToJsonContext(maxDepth: Depth, enumsAsStrings: false, compressOutput: false);
         PSOutputString = JsonObject.ConvertToJson(ResultTable, jsonContext);
     }
