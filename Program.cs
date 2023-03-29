@@ -13,7 +13,9 @@ using Microsoft.PowerShell.Commands;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration.Json;
 using System.Reflection;
+using System.Linq;
 
 string ROOT_DIR = AppContext.BaseDirectory;
 var WebAppBuilder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
@@ -29,12 +31,29 @@ string DateTimeLogFormat = WebAppConfig.GetValue("DateTimeLogFormat", "yyyy-MM-d
 app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, StartUp");
 
 if (IsDevelopment) { app.UseExceptionHandler("/Error"); }
+
 app.UseStaticFiles();
 app.UseRouting();
 app.MapRazorPages();
 
 string WrapperDir = WebAppConfig.GetValue("Path:Wrappers", Path.Join(ROOT_DIR, "_wrappers"))!;
 string ScriptDir = WebAppConfig.GetValue("Path:Scripts", Path.Join(ROOT_DIR, "_scripts"))!;
+var VarCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
+List<string> Wrappers = SearchFiles(WrapperDir,"*.ps1",false);
+List<string> Scripts = SearchFiles(ScriptDir,"*.ps1",false);
+List<string> CachedVariables = WebAppConfig.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
+
+foreach(string Wrapper_ in Wrappers) {
+    VarCache[Wrapper_] = new Dictionary<String, Dictionary<String, object>>()!;
+    foreach(string Script_ in Scripts) {
+        VarCache[Wrapper_][Script_] = new Dictionary<String, object>()!;
+        foreach(string CachedVariable_ in CachedVariables) {
+            VarCache[Wrapper_][Script_][CachedVariable_] = null!;
+        }
+    }
+}
+
+app.Logger.LogInformation($"CachedVariables:{CachedVariables}");
 
 app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, HttpContext Context) =>
     {
@@ -70,20 +89,7 @@ app.Map("/PowerShell/", async (HttpContext Context) =>
 
         try
         {
-            if (Directory.Exists(ScriptDir))
-            {
-                var ScriptDirInfo = new DirectoryInfo(ScriptDir);
-                FileInfo[] Files = ScriptDirInfo.GetFiles("*.ps1");
-                foreach (FileInfo File_ in Files)
-                {
-                    ScriptList.Add(File_.Name.Replace(File_.Extension, ""));
-                }
-            }
-            else
-            {
-                success = false;
-                error = $"Directory {ScriptDir} not found";
-            }
+            ScriptList = SearchFiles(ScriptDir, "*.ps1", true);
         }
         catch (Exception e)
         {
@@ -93,20 +99,7 @@ app.Map("/PowerShell/", async (HttpContext Context) =>
 
         try
         {
-            if (Directory.Exists(WrapperDir))
-            {
-                var WrapperDirInfo = new DirectoryInfo(WrapperDir);
-                FileInfo[] Files = WrapperDirInfo.GetFiles("*.ps1");
-                foreach (FileInfo File_ in Files)
-                {
-                    WrapperList.Add(File_.Name.Replace(File_.Extension, ""));
-                }
-            }
-            else
-            {
-                success = false;
-                error = $"Directory {WrapperDir} not found";
-            }
+            WrapperList = SearchFiles(WrapperDir, "*.ps1", true);
         }
         catch (Exception e)
         {
@@ -154,10 +147,14 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         PSRunspace.SessionStateProxy.SetVariable("ErrorView", WebAppConfig.GetValue("ErrorView", "NormalView"));
         PSRunspace.SessionStateProxy.SetVariable("FormatEnumerationLimit", WebAppConfig.GetValue("FormatEnumerationLimit", 10));
         PSRunspace.SessionStateProxy.SetVariable("OFS", WebAppConfig.GetValue("OFS", ","));
-
+        
         PowerShell PwSh = PowerShell.Create();
         PwSh.Runspace = PSRunspace;
 
+        foreach (string CachedVariable_ in CachedVariables) {
+            PwSh.Runspace.SessionStateProxy.SetVariable(CachedVariable_, VarCache[Wrapper][Script][CachedVariable_]);
+        }
+        
         PwSh.AddCommand(WrapperFile);
         PwSh.AddParameter("ScriptFile", ScriptFile);
         PwSh.AddParameter("Query", Query);
@@ -167,7 +164,7 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         try
         {
             PSObjects = PwSh.Invoke();
-
+            
             Streams.Add("PSObjects", PSObjects);
             Streams.Add("HadErrors", PwSh.HadErrors);
             
@@ -245,7 +242,12 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
 
         try
         {
+            foreach (string CachedVariable_ in CachedVariables) {
+                VarCache[Wrapper][Script][CachedVariable_] = PwSh.Runspace.SessionStateProxy.GetVariable(CachedVariable_);
+            }
+
             PwSh.Runspace.Close();
+
             app.Logger.LogInformation($"RunspaceStateInfo:{PwSh.Runspace.RunspaceStateInfo.State}");
         }
         catch
@@ -280,7 +282,6 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         app.Logger.LogError($"{DateTime.Now.ToString(DateTimeLogFormat)}, Script Error: '{error}'");
     }
 
-
     try
     {
         ResultTable["Success"] = success;
@@ -303,6 +304,27 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
 
     return PSOutputString;
 
+}
+
+List<String> SearchFiles(string Path, string Extension, bool RaiseError) {
+    try {
+        if (Directory.Exists(Path)) {
+            var DirectoryInfo = new DirectoryInfo(Path);
+            return DirectoryInfo.GetFiles(Extension).Select(x => x.Name.Replace(x.Extension,"")).ToList();
+        } else {
+            if (RaiseError) {
+                throw new Exception($"Directory {Path} not found");
+            } else {
+                return new List<String>();
+            }
+        }
+    } catch (Exception e) {
+        if (RaiseError) {
+            throw e;
+        } else {
+            return new List<String>();
+        }
+    }
 }
 
 await app.RunAsync();

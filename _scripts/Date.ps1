@@ -1,1 +1,5 @@
-Get-Date @Params | select *
+@{
+    StartUp = $StartUp
+    Result = Get-Date @Params
+}
+

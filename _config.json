@@ -13,5 +13,8 @@
   "Path": {
     "Wrappers": ".\\_wrappers",
     "Scripts": ".\\_scripts"
-  }
+  },
+  "CachedVariables": [
+    "Credential","StartUp"
+  ]
 }
