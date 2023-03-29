@@ -1,6 +1,10 @@
-New-PSDrive -Name FS -PSProvider FileSystem -Root $Params['Path'] | Out-Null
+param(
+	[string]$Path
+)
 
-$Acl = Get-Acl -Path FS:
+New-PSDrive -Name FS -PSProvider FileSystem -Root $Path | Out-Null
+
+$Acl = Get-Acl -Path FS:\
 
 $Acl.GetAccessRules($true,$true,[System.Security.Principal.NTAccount]) | ? {$_.FileSystemRights -ge 1} | Select-Object -Property @(
     ,@{Name = 'FileSystemRights'; Expression = {$_.FileSystemRights.ToString()}}

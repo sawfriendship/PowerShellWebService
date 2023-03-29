@@ -5,6 +5,4 @@ Properties
 *.bak
 *.dib
 _wrappers/_*
-_wrappers/test*
 _scripts/_*
-_scripts/test*
