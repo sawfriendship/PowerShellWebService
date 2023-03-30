@@ -1,5 +1,5 @@
 param(
-	[string]$Path
+	[Parameter(Mandatory)][string]$Path
 )
 
 New-PSDrive -Name FS -PSProvider FileSystem -Root $Path | Out-Null
