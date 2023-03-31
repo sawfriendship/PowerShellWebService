@@ -1,20 +1,25 @@
 {
   "IsDevelopment": false,
   "ExecutionPolicy": "Unrestricted",
-  "ErrorActionPreference": "Continue",
-  "VerbosePreference": "SilentlyContinue",
-  "WarningPreference": "Continue",
-  "DebugPreference": "Continue",
-  "ErrorView": "NormalView",
-  "Depth": 4,
-  "FormatEnumerationLimit": 10,
-  "OFS": ",",
   "DateTimeLogFormat": "yyyy-MM-dd HH:mm:ss",
+  "Depth": 4,
   "Path": {
     "Wrappers": ".\\_wrappers",
     "Scripts": ".\\_scripts"
   },
+  "Variables": {
+    "ErrorActionPreference": "Continue",
+    "WarningPreference": "Continue",
+    "VerbosePreference": "SilentlyContinue",
+    "DebugPreference": "Continue",
+    "ProgressPreference": "SilentlyContinue",
+    "ErrorView": "NormalView",
+    "FormatEnumerationLimit": 10,
+    "OFS": ",",
+    "_test_": 42
+  },
   "CachedVariables": [
-    "Credential","StartUp"
+    "Credential",
+    "StartUp"
   ]
 }

@@ -1,5 +1,1 @@
-@{
-    StartUp = $StartUp
-    Result = Get-Date @Params
-}
-
+Get-Date @Params

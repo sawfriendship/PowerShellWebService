@@ -13,9 +13,6 @@ if ($Context.Request.Method -eq 'GET') {
 	[hashtable]$Params = ConvertFrom-Json -InputObject $Body -AsHashtable   
 }
 
-
 Set-Alias -Name 'Script' -Value $ScriptFile
 
 Script @Params
-
-

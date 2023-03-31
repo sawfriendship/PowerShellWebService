@@ -38,34 +38,11 @@ app.MapRazorPages();
 
 string WrapperDir = WebAppConfig.GetValue("Path:Wrappers", Path.Join(ROOT_DIR, "_wrappers"))!;
 string ScriptDir = WebAppConfig.GetValue("Path:Scripts", Path.Join(ROOT_DIR, "_scripts"))!;
+var PSRunspaceVariables = WebAppConfig.GetSection("Variables").GetChildren().ToList();
 var VarCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
 List<string> Wrappers = SearchFiles(WrapperDir,"*.ps1",false);
 List<string> Scripts = SearchFiles(ScriptDir,"*.ps1",false);
 List<string> CachedVariables = WebAppConfig.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
-
-app.Logger.LogInformation($"CachedVariables:{CachedVariables}");
-
-app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, HttpContext Context) =>
-    {
-        Context.Response.Headers["Content-Type"] = "application/json; charset=utf-8";
-
-        var Request = Context.Request;
-        var Query = new Dictionary<String, String>();
-        var Headers = new Dictionary<String, String>();
-
-        foreach (string Key in Request.Query.Keys) { Query[Key.ToUpper()] = Request.Query[Key]!; }
-        foreach (string Key in Request.Headers.Keys) { Headers[Key.ToUpper()] = Request.Headers[Key]!; }
-
-        int Depth = WebAppConfig.GetValue("Depth", 4);
-
-        if (Headers.ContainsKey("DEPTH")) { if (int.TryParse(Headers["DEPTH"], out int Depth_)) { Depth = Depth_; } }
-
-        using var streamReader = new StreamReader(Request.Body, encoding: System.Text.Encoding.UTF8);
-        string Body = await streamReader.ReadToEndAsync();
-        string pwsh_result = PSScriptRunner(Wrapper, Script, Query, Body, Depth, Context);
-        await Context.Response.WriteAsync(pwsh_result);
-    }
-);
 
 app.Map("/PowerShell/", async (HttpContext Context) =>
     {
@@ -96,6 +73,7 @@ app.Map("/PowerShell/", async (HttpContext Context) =>
             success = false;
             error = e.ToString();
         }
+        
         ResultTable["Success"] = success;
         ResultTable["Error"] = error;
         ResultTable["Wrappers"] = WrapperList;
@@ -107,9 +85,31 @@ app.Map("/PowerShell/", async (HttpContext Context) =>
     }
 );
 
-app.Map("/PowerShell/ReloadVarCache", async (HttpContext Context) =>
+app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, HttpContext Context) =>
     {
-        ReloadVarCache();
+        Context.Response.Headers["Content-Type"] = "application/json; charset=utf-8";
+
+        var Request = Context.Request;
+        var Query = new Dictionary<String, String>();
+        var Headers = new Dictionary<String, String>();
+
+        foreach (string Key in Request.Query.Keys) { Query[Key.ToUpper()] = Request.Query[Key]!; }
+        foreach (string Key in Request.Headers.Keys) { Headers[Key.ToUpper()] = Request.Headers[Key]!; }
+
+        int Depth = WebAppConfig.GetValue("Depth", 4);
+
+        if (Headers.ContainsKey("DEPTH")) { if (int.TryParse(Headers["DEPTH"], out int Depth_)) { Depth = Depth_; } }
+
+        using var streamReader = new StreamReader(Request.Body, encoding: System.Text.Encoding.UTF8);
+        string Body = await streamReader.ReadToEndAsync();
+        string pwsh_result = PSScriptRunner(Wrapper, Script, Query, Body, Depth, Context);
+        await Context.Response.WriteAsync(pwsh_result);
+    }
+);
+
+app.Map("/PowerShell/ClearCache", async (HttpContext Context) =>
+    {
+        ClearCache();
         await Context.Response.WriteAsync("ok");
     }
 );
@@ -137,16 +137,19 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         var PSRunspace = System.Management.Automation.Runspaces.RunspaceFactory.CreateRunspace(initialSessionState);
         PSRunspace.Open();
 
-        PSRunspace.SessionStateProxy.SetVariable("ErrorActionPreference", WebAppConfig.GetValue("ErrorActionPreference", "SilentlyContinue"));
-        PSRunspace.SessionStateProxy.SetVariable("VerbosePreference", WebAppConfig.GetValue("VerbosePreference", "SilentlyContinue"));
-        PSRunspace.SessionStateProxy.SetVariable("WarningPreference", WebAppConfig.GetValue("WarningPreference", "SilentlyContinue"));
-        PSRunspace.SessionStateProxy.SetVariable("DebugPreference", WebAppConfig.GetValue("DebugPreference", "SilentlyContinue"));
-        PSRunspace.SessionStateProxy.SetVariable("ErrorView", WebAppConfig.GetValue("ErrorView", "NormalView"));
-        PSRunspace.SessionStateProxy.SetVariable("FormatEnumerationLimit", WebAppConfig.GetValue("FormatEnumerationLimit", 10));
-        PSRunspace.SessionStateProxy.SetVariable("OFS", WebAppConfig.GetValue("OFS", ","));
-        
+        foreach (var PSRunspaceVariable_ in PSRunspaceVariables) {
+            PSRunspace.SessionStateProxy.SetVariable(PSRunspaceVariable_.Key, PSRunspaceVariable_.Value);
+        }
+
         PowerShell PwSh = PowerShell.Create();
         PwSh.Runspace = PSRunspace;
+        
+        if (VarCache.ContainsKey(Wrapper) && VarCache[Wrapper].ContainsKey(Script)) {
+            app.Logger.LogDebug("Using Cache");
+        } else {
+            app.Logger.LogDebug("Update Cache");
+            LoadCache();
+        }
 
         foreach (string CachedVariable_ in CachedVariables) {
             PwSh.Runspace.SessionStateProxy.SetVariable(CachedVariable_, VarCache[Wrapper][Script][CachedVariable_]);
@@ -324,11 +327,27 @@ List<String> SearchFiles(string Path, string Extension, bool RaiseError) {
     }
 }
 
-void ReloadVarCache() {
+void LoadCache() {
+    Wrappers = SearchFiles(WrapperDir,"*.ps1",false);
+    Scripts = SearchFiles(ScriptDir,"*.ps1",false);
     foreach(string Wrapper_ in Wrappers) {
-        VarCache[Wrapper_] = new Dictionary<String, Dictionary<String, object>>()!;
+        if (!VarCache.ContainsKey(Wrapper_)) {VarCache[Wrapper_] = new Dictionary<String, Dictionary<String, object>>();}
         foreach(string Script_ in Scripts) {
-            VarCache[Wrapper_][Script_] = new Dictionary<String, object>()!;
+            if (!VarCache[Wrapper_].ContainsKey(Script_)) {VarCache[Wrapper_][Script_] = new Dictionary<String, object>();}
+            foreach(string CachedVariable_ in CachedVariables) {
+                if (!VarCache[Wrapper_][Script_].ContainsKey(CachedVariable_)) {VarCache[Wrapper_][Script_][CachedVariable_] = null!;}
+            }
+        }
+    }
+}
+
+void ClearCache() {
+    Wrappers = SearchFiles(WrapperDir,"*.ps1",false);
+    Scripts = SearchFiles(ScriptDir,"*.ps1",false);
+    foreach(string Wrapper_ in Wrappers) {
+        VarCache[Wrapper_] = new Dictionary<String, Dictionary<String, object>>();
+        foreach(string Script_ in Scripts) {
+            VarCache[Wrapper_][Script_] = new Dictionary<String, object>();
             foreach(string CachedVariable_ in CachedVariables) {
                 VarCache[Wrapper_][Script_][CachedVariable_] = null!;
             }
@@ -336,6 +355,6 @@ void ReloadVarCache() {
     }
 }
 
-ReloadVarCache();
+LoadCache();
 
 await app.RunAsync();
