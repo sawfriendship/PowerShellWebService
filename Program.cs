@@ -43,16 +43,6 @@ List<string> Wrappers = SearchFiles(WrapperDir,"*.ps1",false);
 List<string> Scripts = SearchFiles(ScriptDir,"*.ps1",false);
 List<string> CachedVariables = WebAppConfig.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
 
-foreach(string Wrapper_ in Wrappers) {
-    VarCache[Wrapper_] = new Dictionary<String, Dictionary<String, object>>()!;
-    foreach(string Script_ in Scripts) {
-        VarCache[Wrapper_][Script_] = new Dictionary<String, object>()!;
-        foreach(string CachedVariable_ in CachedVariables) {
-            VarCache[Wrapper_][Script_][CachedVariable_] = null!;
-        }
-    }
-}
-
 app.Logger.LogInformation($"CachedVariables:{CachedVariables}");
 
 app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, HttpContext Context) =>
@@ -114,6 +104,13 @@ app.Map("/PowerShell/", async (HttpContext Context) =>
         JsonObject.ConvertToJsonContext jsonContext = new JsonObject.ConvertToJsonContext(maxDepth: 4, enumsAsStrings: false, compressOutput: false);
         string OutputString = JsonObject.ConvertToJson(ResultTable, jsonContext);
         await Context.Response.WriteAsync(OutputString);
+    }
+);
+
+app.Map("/PowerShell/ReloadVarCache", async (HttpContext Context) =>
+    {
+        ReloadVarCache();
+        await Context.Response.WriteAsync("ok");
     }
 );
 
@@ -326,5 +323,19 @@ List<String> SearchFiles(string Path, string Extension, bool RaiseError) {
         }
     }
 }
+
+void ReloadVarCache() {
+    foreach(string Wrapper_ in Wrappers) {
+        VarCache[Wrapper_] = new Dictionary<String, Dictionary<String, object>>()!;
+        foreach(string Script_ in Scripts) {
+            VarCache[Wrapper_][Script_] = new Dictionary<String, object>()!;
+            foreach(string CachedVariable_ in CachedVariables) {
+                VarCache[Wrapper_][Script_][CachedVariable_] = null!;
+            }
+        }
+    }
+}
+
+ReloadVarCache();
 
 await app.RunAsync();
