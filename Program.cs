@@ -173,9 +173,10 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         PwSh.AddParameter("Query", Query);
         PwSh.AddParameter("Body", Body);
         PwSh.AddParameter("Context", Context);
-
         try {
+            DateTime BeginDate = DateTime.Now;
             PSObjects = PwSh.Invoke();
+            DateTime EndDate = DateTime.Now;
             
             Streams.Add("PSObjects", PSObjects);
             HadErrors = PwSh.HadErrors;
@@ -238,11 +239,9 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
             Streams["Information"] = InformationList;
             Streams["Debug"] = PwSh.Streams.Debug;
             
+            StateInfo["Duration"] = (EndDate - BeginDate).TotalSeconds;
             StateInfo["State"] = $"{PwSh.InvocationStateInfo.State}";
-            StateInfo["StateCode"] = PwSh.InvocationStateInfo.State;
             StateInfo["Reason"] = $"{PwSh.InvocationStateInfo.Reason}";
-
-
 
         } catch (Exception e) {
             error = $"{e.Message}";
@@ -321,7 +320,7 @@ int IvokeSqlWithParam(string ConnectionString, string Query, OrderedDictionary P
     SqlCommand Command = new SqlCommand(Query, Connection);
     int id = 0;
     foreach (var Param_ in Params.Keys) {
-        Command.Parameters.AddWithValue($"@{Param_.ToString().TrimStart('@')}",Params[Param_]);
+        Command.Parameters.AddWithValue($"@{Param_!.ToString().TrimStart('@')}",Params[Param_]);
     }
     try {
         Connection.Open();

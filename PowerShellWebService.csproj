@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="runtime.native.System.Data.SqlClient.sni" Version="4.7.0" />
+    <PackageReference Include="runtime.native.System.Data.SqlClient.sni" Version="*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -57,7 +57,7 @@
 	<Reference Include="Microsoft.Win32.SystemEvents"><HintPath>C:\Program Files\PowerShell\7\Microsoft.Win32.SystemEvents.dll</HintPath></Reference>
 	<Reference Include="Microsoft.WSMan.Management"><HintPath>C:\Program Files\PowerShell\7\Microsoft.WSMan.Management.dll</HintPath></Reference>
 	<Reference Include="Microsoft.WSMan.Runtime"><HintPath>C:\Program Files\PowerShell\7\Microsoft.WSMan.Runtime.dll</HintPath></Reference>
-	<Reference Include="mscorlib"><HintPath>C:\Program Files\PowerShell\7\mscorlib.dll</HintPath></Reference>
+	<!-- <Reference Include="mscorlib"><HintPath>C:\Program Files\PowerShell\7\mscorlib.dll</HintPath></Reference> -->
 	<Reference Include="Namotion.Reflection"><HintPath>C:\Program Files\PowerShell\7\Namotion.Reflection.dll</HintPath></Reference>
 	<Reference Include="netstandard"><HintPath>C:\Program Files\PowerShell\7\netstandard.dll</HintPath></Reference>
 	<Reference Include="Newtonsoft.Json"><HintPath>C:\Program Files\PowerShell\7\Newtonsoft.Json.dll</HintPath></Reference>
