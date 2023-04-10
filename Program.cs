@@ -16,14 +16,16 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration.Json;
 using System.Reflection;
 using System.Linq;
+using System.Data.SqlClient;
 
-string ROOT_DIR = AppContext.BaseDirectory;
+var WebAppConfig = new ConfigurationBuilder().AddJsonFile("_config.json", optional: true, reloadOnChange: true).Build();
 var WebAppBuilder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
 
 WebAppBuilder.Logging.AddJsonConsole();
 WebAppBuilder.Services.AddRazorPages();
+
 await using var app = WebAppBuilder.Build();
-var WebAppConfig = new ConfigurationBuilder().AddJsonFile("_config.json", optional: true, reloadOnChange: true).Build();
+
 
 bool IsDevelopment = WebAppConfig.GetValue("IsDevelopment", false)!;
 string DateTimeLogFormat = WebAppConfig.GetValue("DateTimeLogFormat", "yyyy-MM-dd HH:mm:ss")!;
@@ -31,56 +33,42 @@ string DateTimeLogFormat = WebAppConfig.GetValue("DateTimeLogFormat", "yyyy-MM-d
 app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, StartUp");
 
 if (IsDevelopment) { app.UseExceptionHandler("/Error"); }
-
 app.UseStaticFiles();
 app.UseRouting();
 app.MapRazorPages();
 
-string WrapperDir = WebAppConfig.GetValue("Path:Wrappers", Path.Join(ROOT_DIR, "_wrappers"))!;
-string ScriptDir = WebAppConfig.GetValue("Path:Scripts", Path.Join(ROOT_DIR, "_scripts"))!;
-var PSRunspaceVariables = WebAppConfig.GetSection("Variables").GetChildren().ToList();
-var VarCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
-List<string> Wrappers = SearchFiles(WrapperDir,"*.ps1",false);
-List<string> Scripts = SearchFiles(ScriptDir,"*.ps1",false);
+string ROOT_DIR = AppContext.BaseDirectory;
+string ScriptRoot = WebAppConfig.GetValue("ScriptRoot", Path.Join(ROOT_DIR, "_scripts"))!;
+var ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
 List<string> CachedVariables = WebAppConfig.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
+var PSRunspaceVariables = WebAppConfig.GetSection("Variables").GetChildren().ToList();
+bool SqlLoggingEnabled = WebAppConfig.GetValue("SqlLogging:Enabled", false);
+string SqlConnectionString = WebAppConfig.GetValue("SqlLogging:ConnectionString", "")!;
+string SqlTable = WebAppConfig.GetValue("SqlLogging:Table", "Log")!;
+
+if (SqlLoggingEnabled) {
+    OrderedDictionary SqlLog = new OrderedDictionary();
+    string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
+    IvokeSqlWithParam(SqlConnectionString,SqlQuery,SqlLog);
+}
+
+ScriptLoader();
 
 app.Map("/PowerShell/", async (HttpContext Context) =>
     {
+        var WrapperDict = ScriptCache.ToDictionary(x => x.Key, x => x.Value.Keys.ToList());
+        string OutputString = ConvertToJson(WrapperDict,1);
         Context.Response.Headers["Content-Type"] = "application/json; charset=utf-8";
-        OrderedDictionary ResultTable = new OrderedDictionary();
-        List<String> WrapperList = new List<String>();
-        List<String> ScriptList = new List<String>();
+        await Context.Response.WriteAsync(OutputString);
+    }
+);
 
-        bool success = true;
-        string error = "";
-
-        try
-        {
-            ScriptList = SearchFiles(ScriptDir, "*.ps1", true);
-        }
-        catch (Exception e)
-        {
-            success = false;
-            error = e.ToString();
-        }
-
-        try
-        {
-            WrapperList = SearchFiles(WrapperDir, "*.ps1", true);
-        }
-        catch (Exception e)
-        {
-            success = false;
-            error = e.ToString();
-        }
-        
-        ResultTable["Success"] = success;
-        ResultTable["Error"] = error;
-        ResultTable["Wrappers"] = WrapperList;
-        ResultTable["Scripts"] = ScriptList;
-
-        JsonObject.ConvertToJsonContext jsonContext = new JsonObject.ConvertToJsonContext(maxDepth: 4, enumsAsStrings: false, compressOutput: false);
-        string OutputString = JsonObject.ConvertToJson(ResultTable, jsonContext);
+app.Map("/PowerShell/{Wrapper}", async (string Wrapper, HttpContext Context) =>
+    {
+        List<string> Scripts = new List<string>();
+        if (ScriptCache.ContainsKey(Wrapper)) {Scripts = ScriptCache[Wrapper].Keys.ToList();}
+        string OutputString = ConvertToJson(Scripts,1);
+        Context.Response.Headers["Content-Type"] = "application/json; charset=utf-8";
         await Context.Response.WriteAsync(OutputString);
     }
 );
@@ -89,47 +77,75 @@ app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, 
     {
         Context.Response.Headers["Content-Type"] = "application/json; charset=utf-8";
 
-        var Request = Context.Request;
-        var Query = new Dictionary<String, String>();
-        var Headers = new Dictionary<String, String>();
-
-        foreach (string Key in Request.Query.Keys) { Query[Key.ToUpper()] = Request.Query[Key]!; }
-        foreach (string Key in Request.Headers.Keys) { Headers[Key.ToUpper()] = Request.Headers[Key]!; }
+        Dictionary<String, String> Query = Context.Request.Query.ToDictionary(x => x.Key.ToUpper().ToString(), x => x.Value.ToString());
+        Dictionary<String, String> Headers = Context.Request.Headers.ToDictionary(x => x.Key.ToUpper().ToString(), x => x.Value.ToString());
 
         int Depth = WebAppConfig.GetValue("Depth", 4);
-
         if (Headers.ContainsKey("DEPTH")) { if (int.TryParse(Headers["DEPTH"], out int Depth_)) { Depth = Depth_; } }
 
-        using var streamReader = new StreamReader(Request.Body, encoding: System.Text.Encoding.UTF8);
+        using var streamReader = new StreamReader(Context.Request.Body, encoding: System.Text.Encoding.UTF8);
         string Body = await streamReader.ReadToEndAsync();
         string pwsh_result = PSScriptRunner(Wrapper, Script, Query, Body, Depth, Context);
         await Context.Response.WriteAsync(pwsh_result);
     }
 );
 
-app.Map("/PowerShell/ClearCache", async (HttpContext Context) =>
+app.Map("/PowerShell/reload", async (HttpContext Context) =>
+    {
+        ScriptLoader();
+        await Context.Response.WriteAsync("ok");
+    }
+);
+
+app.Map("/PowerShell/clear", async (HttpContext Context) =>
     {
         ClearCache();
         await Context.Response.WriteAsync("ok");
     }
 );
 
-string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> Query, string Body, int Depth, HttpContext Context)
-{
+string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> Query, string Body, int Depth, HttpContext Context) {
+    int SqlLogID = 0;
+    if (SqlLoggingEnabled) {
+        OrderedDictionary SqlLog = new OrderedDictionary();
+        SqlLog["Method"] = Context.Request.Method;
+        SqlLog["Wrapper"] = Wrapper;
+        SqlLog["Script"] = Script;
+        SqlLog["Body"] = Body;
+        string SqlQuery = $"INSERT INTO {SqlTable} ([Method],[Wrapper],[Script],[Body]) OUTPUT INSERTED.ID VALUES(@Method,@Wrapper,@Script,@Body)";
+        SqlLogID = IvokeSqlWithParam(SqlConnectionString,SqlQuery,SqlLog);
+    }
+
     var PSObjects = new Collection<PSObject>();
     OrderedDictionary ResultTable = new OrderedDictionary();
     OrderedDictionary Streams = new OrderedDictionary();
     OrderedDictionary StateInfo = new OrderedDictionary();
-
     bool success = true;
+    bool HadErrors = false;
     string error = "";
     string PSOutputString = "";
+    var ErrorList = new List<Object>();
+    var WarningList = new List<Object>();
+    var VerboseList = new List<Object>();
+    var InformationList = new List<Object>();
 
-    string WrapperFile = Path.Join(WrapperDir, $"{Wrapper}.ps1");
-    string ScriptFile = Path.Join(ScriptDir, $"{Script}.ps1");
+    string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
+    string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
 
-    if (File.Exists(WrapperFile) && File.Exists(ScriptFile))
-    {
+
+    if (!ScriptCache.ContainsKey(Wrapper)) {
+        success = false;
+        error = $"Wrapper '{Wrapper}' not found in cache, use {Context.Request.Host}/PowerShell/reload for load new scripts or wrappers and {Context.Request.Host}/PowerShell/clear for clear all";
+    } else if (!ScriptCache[Wrapper].ContainsKey(Script)) {
+        success = false;
+        error = $"Script '{Script}' not found in cache, use {Context.Request.Host}/PowerShell/reload for load new scripts or wrappers and {Context.Request.Host}/PowerShell/clear for clear all";
+    } else if (!File.Exists(WrapperFile)) {
+        success = false;
+        error = $"Wrapper '{Wrapper}' not found on disk, use {Context.Request.Host}/PowerShell/reload for load new scripts or wrappers and {Context.Request.Host}/PowerShell/clear for clear all";
+    } else if (!File.Exists(ScriptFile)) {
+        success = false;
+        error = $"Script '{Script}' not found on disk, use {Context.Request.Host}/PowerShell/reload for load new scripts or wrappers and {Context.Request.Host}/PowerShell/clear for clear all";
+    } else {
         var initialSessionState = System.Management.Automation.Runspaces.InitialSessionState.CreateDefault();
         string conf_ExecPol = WebAppConfig.GetValue("ExecutionPolicy", "Unrestricted")!;
         var ExecPol = Enum.Parse(typeof(ExecutionPolicy), conf_ExecPol);
@@ -144,15 +160,8 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         PowerShell PwSh = PowerShell.Create();
         PwSh.Runspace = PSRunspace;
         
-        if (VarCache.ContainsKey(Wrapper) && VarCache[Wrapper].ContainsKey(Script)) {
-            app.Logger.LogDebug("Using Cache");
-        } else {
-            app.Logger.LogDebug("Update Cache");
-            LoadCache();
-        }
-
         foreach (string CachedVariable_ in CachedVariables) {
-            PwSh.Runspace.SessionStateProxy.SetVariable(CachedVariable_, VarCache[Wrapper][Script][CachedVariable_]);
+            PwSh.Runspace.SessionStateProxy.SetVariable(CachedVariable_, ScriptCache[Wrapper][Script][CachedVariable_]);
         }
         
         PwSh.AddCommand(WrapperFile);
@@ -161,17 +170,12 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         PwSh.AddParameter("Body", Body);
         PwSh.AddParameter("Context", Context);
 
-        try
-        {
+        try {
             PSObjects = PwSh.Invoke();
             
             Streams.Add("PSObjects", PSObjects);
-            Streams.Add("HadErrors", PwSh.HadErrors);
-            
-            var ErrorList = new List<Object>();
-            var WarningList = new List<Object>();
-            var VerboseList = new List<Object>();
-            var InformationList = new List<Object>();
+            HadErrors = PwSh.HadErrors;
+            Streams.Add("HadErrors", HadErrors);
 
             foreach (var Stream in PwSh.Streams.Error) {
                 var StreamDictionary = new Dictionary<String, Object>();
@@ -193,7 +197,7 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
                 StreamDictionary["FullyQualifiedErrorId"] = $"{Stream.FullyQualifiedErrorId}";
                 ErrorList.Add(StreamDictionary);
             }
-
+            
             foreach (var Stream in PwSh.Streams.Warning) {
                 var StreamDictionary = new Dictionary<String, Object>();
                 var NewInvocationInfo = new Dictionary<String, Object>();
@@ -233,53 +237,22 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
             StateInfo["State"] = $"{PwSh.InvocationStateInfo.State}";
             StateInfo["StateCode"] = PwSh.InvocationStateInfo.State;
             StateInfo["Reason"] = $"{PwSh.InvocationStateInfo.Reason}";
-        }
-        catch (Exception e)
-        {
+
+
+
+        } catch (Exception e) {
             error = $"{e.Message}";
             success = false;
         }
 
-        try
-        {
+        try {
             foreach (string CachedVariable_ in CachedVariables) {
-                VarCache[Wrapper][Script][CachedVariable_] = PwSh.Runspace.SessionStateProxy.GetVariable(CachedVariable_);
+                ScriptCache[Wrapper][Script][CachedVariable_] = PwSh.Runspace.SessionStateProxy.GetVariable(CachedVariable_);
             }
-
+        } finally {
             PwSh.Runspace.Close();
-
-            app.Logger.LogInformation($"RunspaceStateInfo:{PwSh.Runspace.RunspaceStateInfo.State}");
-        }
-        catch
-        {
-            app.Logger.LogError($"RunspaceStateInfo:{PwSh.Runspace.RunspaceStateInfo.State}");
         }
 
-    }
-    else
-    {
-        if (!File.Exists(ScriptFile))
-        {
-            error = $"Script '{Script}.ps1' not found in dir '{ScriptDir}'";
-            success = false;
-        }
-
-        if (!File.Exists(WrapperFile))
-        {
-            error = $"Wrapper '{Wrapper}.ps1' not found in dir '{WrapperDir}'";
-            success = false;
-        }
-
-    }
-
-
-    if (success)
-    {
-        app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, Success run Script '{Script}.ps1' with Wrapper '{Wrapper}.ps1'");
-    }
-    else
-    {
-        app.Logger.LogError($"{DateTime.Now.ToString(DateTimeLogFormat)}, Script Error: '{error}'");
     }
 
     try
@@ -288,22 +261,79 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         ResultTable["Error"] = error;
         ResultTable["Streams"] = Streams;
         ResultTable["InvocationStateInfo"] = StateInfo;
-        JsonObject.ConvertToJsonContext jsonContext = new JsonObject.ConvertToJsonContext(maxDepth: Depth, enumsAsStrings: false, compressOutput: false);
-        PSOutputString = JsonObject.ConvertToJson(ResultTable, jsonContext);
-    }
-    catch (Exception e)
-    {
+        PSOutputString = ConvertToJson(ResultTable,Depth,RaiseError:true);
+    } catch (Exception e) {
         Streams.Clear();
-        ResultTable["Success"] = false;
+        success = false;
+        ResultTable["Success"] = success;
         ResultTable["Error"] = $"JSON serialization error: {e.ToString()}";
         ResultTable["Streams"] = Streams;
         ResultTable["InvocationStateInfo"] = StateInfo;
-        JsonObject.ConvertToJsonContext jsonContext = new JsonObject.ConvertToJsonContext(maxDepth: Depth, enumsAsStrings: false, compressOutput: false);
-        PSOutputString = JsonObject.ConvertToJson(ResultTable, jsonContext);
+        PSOutputString = ConvertToJson(ResultTable,Depth,RaiseError:false);
+    }
+
+    if (SqlLoggingEnabled && SqlLogID > 0) {
+        string PSObjectsJson = ConvertToJson(PSObjects,4,true,true,false);
+        string ErrorListJson = ConvertToJson(ErrorList,3,true,true,false);
+        string WarningListJson = ConvertToJson(WarningList,3,true,true,false);
+        string InformationListJson = ConvertToJson(InformationList,3,true,true,false);
+        string VerboseListJson = ConvertToJson(VerboseList,3,true,true,false);
+
+        OrderedDictionary SqlLog = new OrderedDictionary();
+
+        SqlLog["EndDate"] = DateTime.Now;
+        SqlLog["HadErrors"] = HadErrors;
+        SqlLog["Error"] = error;
+        SqlLog["Success"] = success;
+        SqlLog["PSObjects"] = PSObjectsJson;
+        SqlLog["StreamError"] = ErrorListJson;
+        SqlLog["StreamWarning"] = WarningListJson;
+        SqlLog["StreamInformation"] = InformationListJson;
+        SqlLog["StreamVerbose"] = VerboseListJson;
+        string SqlQuery = $"UPDATE {SqlTable} SET [EndDate]=@EndDate,[Success]=@Success,[PSObjects]=@PSObjects,[StreamError]=@StreamError,[StreamWarning]=@StreamWarning,[StreamInformation]=@StreamInformation,[StreamVerbose]=@StreamVerbose,[HadErrors]=@HadErrors,[Error]=@Error WHERE ID = {SqlLogID}";
+        IvokeSqlWithParam(SqlConnectionString,SqlQuery,SqlLog);
     }
 
     return PSOutputString;
 
+}
+
+string ConvertToJson(object data, int maxDepth = 4, bool enumsAsStrings = true, bool compressOutput = false, bool RaiseError = false) {
+    JsonObject.ConvertToJsonContext jsonContext = new JsonObject.ConvertToJsonContext(maxDepth: maxDepth, enumsAsStrings: enumsAsStrings, compressOutput: compressOutput);
+    string Result = "[]";
+    try {
+        Result = JsonObject.ConvertToJson(data, jsonContext);
+    } catch (Exception e) {
+        if (RaiseError) {
+            app.Logger.LogError($"{DateTime.Now.ToString(DateTimeLogFormat)}, ConvertToJson Error: '{e}'");
+            throw e;
+        }
+    }
+    return Result;
+}
+
+int IvokeSqlWithParam(string ConnectionString, string Query, OrderedDictionary Params) {
+    SqlConnection Connection = new SqlConnection(ConnectionString);
+    SqlCommand Command = new SqlCommand(Query, Connection);
+    int id = 0;
+    foreach (var Param_ in Params.Keys) {
+        Command.Parameters.AddWithValue($"@{Param_.ToString().TrimStart('@')}",Params[Param_]);
+    }
+    try {
+        Connection.Open();
+        using (SqlDataReader DataReader = Command.ExecuteReader()) {
+            if (DataReader.Read()) {
+                id = Convert.ToInt32(DataReader["id"]);
+            }
+        }
+        app.Logger.LogInformation($"SQL Write Success, id: {id}");
+    } catch (Exception e) {
+        app.Logger.LogError($"SQL Write Error: {e}");
+    } finally {
+        Connection.Close();
+    }
+
+    return id;
 }
 
 List<String> SearchFiles(string Path, string Extension, bool RaiseError) {
@@ -327,34 +357,40 @@ List<String> SearchFiles(string Path, string Extension, bool RaiseError) {
     }
 }
 
-void LoadCache() {
-    Wrappers = SearchFiles(WrapperDir,"*.ps1",false);
-    Scripts = SearchFiles(ScriptDir,"*.ps1",false);
-    foreach(string Wrapper_ in Wrappers) {
-        if (!VarCache.ContainsKey(Wrapper_)) {VarCache[Wrapper_] = new Dictionary<String, Dictionary<String, object>>();}
+Dictionary<String, List<String>> ScriptLoader() {
+    var results = new Dictionary<String, List<String>>();
+    var DirectoryInfo = new DirectoryInfo(ScriptRoot);
+    var Wrappers = DirectoryInfo.GetDirectories().Where(x => File.Exists(Path.Join(ScriptRoot,x.Name,"wrapper.ps1"))).Select(x => x.Name).ToList();
+    foreach (string Wrapper_ in Wrappers) {
+        if (!ScriptCache.ContainsKey(Wrapper_)) {ScriptCache[Wrapper_] = new Dictionary<String, Dictionary<String, object>>();}
+        string ScriptPath = Path.Join(ScriptRoot,Wrapper_,"scripts");
+        var Scripts = SearchFiles(ScriptPath,"*.ps1",false);
+        results[Wrapper_] = Scripts;
         foreach(string Script_ in Scripts) {
-            if (!VarCache[Wrapper_].ContainsKey(Script_)) {VarCache[Wrapper_][Script_] = new Dictionary<String, object>();}
+            if (!ScriptCache[Wrapper_].ContainsKey(Script_)) {ScriptCache[Wrapper_][Script_] = new Dictionary<String, object>();}
             foreach(string CachedVariable_ in CachedVariables) {
-                if (!VarCache[Wrapper_][Script_].ContainsKey(CachedVariable_)) {VarCache[Wrapper_][Script_][CachedVariable_] = null!;}
+                if (!ScriptCache[Wrapper_][Script_].ContainsKey(CachedVariable_)) {ScriptCache[Wrapper_][Script_][CachedVariable_] = null!;}
             }
         }
     }
+    return results;
 }
-
+ 
 void ClearCache() {
-    Wrappers = SearchFiles(WrapperDir,"*.ps1",false);
-    Scripts = SearchFiles(ScriptDir,"*.ps1",false);
+    ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
+    var DirectoryInfo = new DirectoryInfo(ScriptRoot);
+    var Wrappers = DirectoryInfo.GetDirectories().Where(x => File.Exists(Path.Join(ScriptRoot,x.Name,"wrapper.ps1"))).Select(x => x.Name).ToList();
     foreach(string Wrapper_ in Wrappers) {
-        VarCache[Wrapper_] = new Dictionary<String, Dictionary<String, object>>();
+        List<string> Scripts = SearchFiles(Path.Join(ScriptRoot,Wrapper_,"scripts"),"*.ps1",false);
+        ScriptCache[Wrapper_] = new Dictionary<String, Dictionary<String, object>>();
         foreach(string Script_ in Scripts) {
-            VarCache[Wrapper_][Script_] = new Dictionary<String, object>();
+            ScriptCache[Wrapper_][Script_] = new Dictionary<String, object>();
             foreach(string CachedVariable_ in CachedVariables) {
-                VarCache[Wrapper_][Script_][CachedVariable_] = null!;
+                ScriptCache[Wrapper_][Script_][CachedVariable_] = null!;
             }
         }
     }
 }
-
-LoadCache();
 
 await app.RunAsync();
+

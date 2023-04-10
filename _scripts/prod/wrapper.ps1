@@ -16,3 +16,5 @@ if ($Context.Request.Method -eq 'GET') {
 Set-Alias -Name 'Script' -Value $ScriptFile
 
 Script @Params
+
+[gc]::collect()

@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="runtime.native.System.Data.SqlClient.sni" Version="4.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
 	<None Update="_scripts\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
 	<None Update="_wrappers\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
 	<None Update="wwwroot\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>

@@ -3,10 +3,7 @@
   "ExecutionPolicy": "Unrestricted",
   "DateTimeLogFormat": "yyyy-MM-dd HH:mm:ss",
   "Depth": 4,
-  "Path": {
-    "Wrappers": ".\\_wrappers",
-    "Scripts": ".\\_scripts"
-  },
+  "ScriptRoot": ".\\_scripts",
   "Variables": {
     "ErrorActionPreference": "Continue",
     "WarningPreference": "Continue",
@@ -21,5 +18,10 @@
   "CachedVariables": [
     "Credential",
     "StartUp"
-  ]
+  ],
+  "SqlLogging": {
+    "Enabled": true,
+    "Table": "Log",
+    "ConnectionString": "Server=dev.net.home;Database=PwSh;Integrated Security=true;Trusted_Connection=True;TrustServerCertificate=true;"
+  }
 }
