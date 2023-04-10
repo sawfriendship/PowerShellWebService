@@ -43,6 +43,7 @@ var ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, o
 List<string> CachedVariables = WebAppConfig.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
 var PSRunspaceVariables = WebAppConfig.GetSection("Variables").GetChildren().ToList();
 bool SqlLoggingEnabled = WebAppConfig.GetValue("SqlLogging:Enabled", false);
+bool AbortScriptOnSqlFailure = WebAppConfig.GetValue("SqlLogging:AbortScriptOnFailure", true);
 string SqlConnectionString = WebAppConfig.GetValue("SqlLogging:ConnectionString", "")!;
 string SqlTable = WebAppConfig.GetValue("SqlLogging:Table", "Log")!;
 
@@ -133,7 +134,10 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
     string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
 
 
-    if (!ScriptCache.ContainsKey(Wrapper)) {
+    if (AbortScriptOnSqlFailure && SqlLogID == 0) {
+        success = false;
+        error = $"SQL Failure";
+    } else if (!ScriptCache.ContainsKey(Wrapper)) {
         success = false;
         error = $"Wrapper '{Wrapper}' not found in cache, use {Context.Request.Host}/PowerShell/reload for load new scripts or wrappers and {Context.Request.Host}/PowerShell/clear for clear all";
     } else if (!ScriptCache[Wrapper].ContainsKey(Script)) {

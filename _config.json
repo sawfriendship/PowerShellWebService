@@ -21,6 +21,7 @@
   ],
   "SqlLogging": {
     "Enabled": true,
+    "AbortScriptOnFailure": true,
     "Table": "Log",
     "ConnectionString": "Server=dev.net.home;Database=PwSh;Integrated Security=true;Trusted_Connection=True;TrustServerCertificate=true;"
   }
