@@ -13,6 +13,7 @@
 
   <ItemGroup>
 	<None Update="_scripts\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
+	<None Update="runtimes\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
 	<None Update="wwwroot\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
   </ItemGroup>
 
