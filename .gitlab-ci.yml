@@ -13,7 +13,7 @@ deploy_to_repository:
    - $Location = Get-Location
    - dotnet.exe add package runtime.native.System.Data.SqlClient.sni
    - dotnet.exe publish --configuration PublishRelease --self-contained true
-   - Import-Module IISAdministration -SkipEditionCheck
+   - Import-Module IISAdministration
    - Get-IISSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
    - Stop-IISSite -Name 'PowerShellWebService' -Confirm:$false -Passthru | ft Id,Name,State,Bindings
    - try {Copy-Item -Force -Recurse -Path "$Location\bin\PublishRelease\net7.0\publish\*" -Destination 'C:\inetpub\PowerShellWebService\'} catch {Write-Warning $_.Exception}
