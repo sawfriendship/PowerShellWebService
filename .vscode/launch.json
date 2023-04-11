@@ -9,7 +9,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net7.0/PowerShellWebService.dll",
+            "program": "${workspaceFolder}/bin/Debug/net7.0/win-x64/PowerShellWebService.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,

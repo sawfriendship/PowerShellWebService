@@ -54,6 +54,16 @@ if (SqlLoggingEnabled) {
 
 ScriptLoader();
 
+app.Map("/whoami", async (HttpContext Context) =>
+    {
+        var UserInfo = new Dictionary<String, Dictionary<String, object>>();
+        UserInfo["User"] = new Dictionary<String, object>();
+        UserInfo["User"]["Identity"] = Context.User.Identity;
+        var result = ConvertToJson(UserInfo);
+        await Context.Response.WriteAsync(result);
+    }
+);
+
 app.Map("/PowerShell/", async (HttpContext Context) =>
     {
         var WrapperDict = ScriptCache.ToDictionary(x => x.Key, x => x.Value.Keys.ToList());

@@ -14,7 +14,11 @@
   <ItemGroup>
 	<None Update="_scripts\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
 	<None Update="runtimes\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
-	<None Update="wwwroot\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
+	<None Update="wwwroot\*">  <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="runtime.native.System.Data.SqlClient.sni" Version="4.7.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -55,7 +59,7 @@
 	<Reference Include="Microsoft.Win32.SystemEvents"><HintPath>C:\Program Files\PowerShell\7\Microsoft.Win32.SystemEvents.dll</HintPath></Reference>
 	<Reference Include="Microsoft.WSMan.Management"><HintPath>C:\Program Files\PowerShell\7\Microsoft.WSMan.Management.dll</HintPath></Reference>
 	<Reference Include="Microsoft.WSMan.Runtime"><HintPath>C:\Program Files\PowerShell\7\Microsoft.WSMan.Runtime.dll</HintPath></Reference>
-	<!-- <Reference Include="mscorlib"><HintPath>C:\Program Files\PowerShell\7\mscorlib.dll</HintPath></Reference> -->
+	<Reference Include="mscorlib"><HintPath>C:\Program Files\PowerShell\7\mscorlib.dll</HintPath></Reference>
 	<Reference Include="Namotion.Reflection"><HintPath>C:\Program Files\PowerShell\7\Namotion.Reflection.dll</HintPath></Reference>
 	<Reference Include="netstandard"><HintPath>C:\Program Files\PowerShell\7\netstandard.dll</HintPath></Reference>
 	<Reference Include="Newtonsoft.Json"><HintPath>C:\Program Files\PowerShell\7\Newtonsoft.Json.dll</HintPath></Reference>
@@ -91,7 +95,7 @@
 	<Reference Include="System.Diagnostics.Contracts"><HintPath>C:\Program Files\PowerShell\7\System.Diagnostics.Contracts.dll</HintPath></Reference>
 	<Reference Include="System.Diagnostics.Debug"><HintPath>C:\Program Files\PowerShell\7\System.Diagnostics.Debug.dll</HintPath></Reference>
 	<Reference Include="System.Diagnostics.DiagnosticSource"><HintPath>C:\Program Files\PowerShell\7\System.Diagnostics.DiagnosticSource.dll</HintPath></Reference>
-	<Reference Include="System.Diagnostics.EventLog"><HintPath>C:\Program Files\PowerShell\7\System.Diagnostics.EventLog.dll</HintPath></Reference>
+	<!-- <Reference Include="System.Diagnostics.EventLog"><HintPath>C:\Program Files\PowerShell\7\System.Diagnostics.EventLog.dll</HintPath></Reference> -->
 	<Reference Include="System.Diagnostics.EventLog.Messages"><HintPath>C:\Program Files\PowerShell\7\System.Diagnostics.EventLog.Messages.dll</HintPath></Reference>
 	<Reference Include="System.Diagnostics.FileVersionInfo"><HintPath>C:\Program Files\PowerShell\7\System.Diagnostics.FileVersionInfo.dll</HintPath></Reference>
 	<Reference Include="System.Diagnostics.PerformanceCounter"><HintPath>C:\Program Files\PowerShell\7\System.Diagnostics.PerformanceCounter.dll</HintPath></Reference>
@@ -269,11 +273,6 @@
 	<Reference Include="System.Xml.XPath.XDocument"><HintPath>C:\Program Files\PowerShell\7\System.Xml.XPath.XDocument.dll</HintPath></Reference>
 	<Reference Include="WindowsBase"><HintPath>C:\Program Files\PowerShell\7\WindowsBase.dll</HintPath></Reference>
 	<Reference Include="WindowsFormsIntegration"><HintPath>C:\Program Files\PowerShell\7\WindowsFormsIntegration.dll</HintPath></Reference>
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Data.SqlClient.SNI.runtime" Version="5.1.0" />
-    <PackageReference Include="runtime.native.System.Data.SqlClient.sni" Version="4.7.0" />
   </ItemGroup>
 
 </Project>
