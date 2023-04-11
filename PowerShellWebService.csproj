@@ -4,7 +4,7 @@
     <TargetFramework>net7.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-	<PublishSingleFile>true</PublishSingleFile>
+	<!-- <PublishSingleFile>true</PublishSingleFile> -->
     <ApplicationIcon>wwwroot\favicon.ico</ApplicationIcon>
 	<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 	<IncludeSymbolsInSingleFile>true</IncludeSymbolsInSingleFile>
