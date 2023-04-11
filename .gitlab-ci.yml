@@ -12,7 +12,7 @@ deploy_to_repository:
    - (Get-Date).ToString('o')
    - $Location = Get-Location
    - dotnet.exe add package runtime.native.System.Data.SqlClient.sni
-   - dotnet.exe build -r win10-x64 --configuration PublishRelease
+   - dotnet.exe build -r win10-x64 --configuration PublishRelease --self-contained
    - Import-Module IISAdministration
    - Get-IISSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
    - Stop-IISSite -Name 'PowerShellWebService' -Confirm:$false -Passthru | ft Id,Name,State,Bindings
