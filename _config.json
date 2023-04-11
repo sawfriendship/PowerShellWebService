@@ -23,6 +23,6 @@
     "Enabled": true,
     "AbortScriptOnFailure": true,
     "Table": "Log",
-    "ConnectionString": "Server=dev.net.home;Database=PwSh;Integrated Security=true;Trusted_Connection=True;TrustServerCertificate=true;"
+    "ConnectionString": "Server=dev;Database=PwSh;Integrated Security=true;Trusted_Connection=True;Encrypt=True;TrustServerCertificate=true;Connection Timeout=3"
   }
 }

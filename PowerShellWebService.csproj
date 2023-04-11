@@ -7,11 +7,8 @@
     <ApplicationIcon>wwwroot\favicon.ico</ApplicationIcon>
 	<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 	<IncludeSymbolsInSingleFile>true</IncludeSymbolsInSingleFile>
+	<ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>None</ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="runtime.native.System.Data.SqlClient.sni" Version="*" />
-  </ItemGroup>
 
   <ItemGroup>
 	<None Update="_scripts\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
@@ -271,6 +268,11 @@
 	<Reference Include="System.Xml.XPath.XDocument"><HintPath>C:\Program Files\PowerShell\7\System.Xml.XPath.XDocument.dll</HintPath></Reference>
 	<Reference Include="WindowsBase"><HintPath>C:\Program Files\PowerShell\7\WindowsBase.dll</HintPath></Reference>
 	<Reference Include="WindowsFormsIntegration"><HintPath>C:\Program Files\PowerShell\7\WindowsFormsIntegration.dll</HintPath></Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient.SNI.runtime" Version="5.1.0" />
+    <PackageReference Include="runtime.native.System.Data.SqlClient.sni" Version="4.7.0" />
   </ItemGroup>
 
 </Project>

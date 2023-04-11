@@ -1,22 +1,70 @@
 ﻿// Please see documentation at https://docs.microsoft.com/aspnet/core/client-side/bundling-and-minification
 // for details on configuring this project to bundle and minify static web assets.
 
-function load_scripts() {
-    var request = {
+function has_key(obj,key){
+    for (k in obj) {if(k==key){return true}}
+    return false
+}
+
+function load_wrapper_form() {
+    $('#_wrapper').html($(`<option value="">---</option>`))
+    $.ajax({
         url: '/PowerShell/',
         method: 'GET',
+        cache: true,
         contentType: 'application/json; charset=utf-8',
         success: function(responce){
-            console.log(responce)
-            for (var i in responce.Wrappers) {$(`<option value="${responce.Wrappers[i]}">${responce.Wrappers[i]}</option>`).appendTo('#_wrapper')}
-            for (var i in responce.Scripts) {$(`<option value="${responce.Scripts[i]}">${responce.Scripts[i]}</option>`).appendTo('#_script')}
-            update_url()
+            for (var k in responce) {$(`<option value="${k}">${k}</option>`).appendTo('#_wrapper')}
+            if (has_key(localStorage,'wrapper')) {
+                var wrapper = localStorage['wrapper']
+                if (wrapper) {
+                    $('#_wrapper').val(wrapper)
+                    $('#_script').prop('disabled', false)
+                }
+
+                load_script_form(wrapper);
+
+                if (has_key(localStorage,'script')) {
+                    var script = localStorage['script']
+                    $('#_script').val(script)
+                }
+                
+            }
         },
         error: function(responce){
+            $('#_script').prop('disabled', true)
         }
-    }
+    })
 
-    $.ajax(request);
+}
+
+function load_script_form(wrapper) {
+    $('#_script').html($(`<option value="">---</option>`))
+    if (wrapper) {
+        $.ajax({
+            url: `/PowerShell/${wrapper}`,
+            method: 'GET',
+            cache: true,
+            contentType: 'application/json; charset=utf-8',
+            success: function(responce){
+                for (var k in responce) {$(`<option value="${responce[k]}">${responce[k]}</option>`).appendTo('#_script')}
+                if (has_key(localStorage,'script')) {
+                    var script = localStorage['script']
+                    $('#_script').val(script)
+                }
+
+                $('#_script').prop('disabled', false)
+                update_url();
+            },
+            error: function(responce){
+                $('#_script').prop('disabled', true)
+            }
+        })
+    } else {
+        $('#_script').prop('disabled', true)
+    }
+        
+    if (has_key(localStorage,'script')) {$('#_script').val(localStorage['script'])}
 }
 
 function ani_send(d) {
@@ -73,9 +121,12 @@ function del_param() {
 }
 
 function update_url() {
+    // var url = `/PowerShell/${wrapper}/${script}`
+    var url = '/PowerShell'
     var wrapper = $('#_wrapper').val()
+    if (wrapper) {url = `${url}/${wrapper}`}
     var script = $('#_script').val()
-    var url = `/PowerShell/${wrapper}/${script}`
+    if (script) {url = `${url}/${script}`}
     $('a#pwsh_url').prop('href',url)
     $('a#pwsh_url').html(url)
     console.log(url)
@@ -141,14 +192,20 @@ function write_to_clip() {
     navigator.clipboard.writeText($('#_result').val())
 }
 
+function cache_reload() {$.ajax({url:'/PowerShell/reload',success:function(responce){load_wrapper_form();}})}
+function cache_clear() {$.ajax({url:'/PowerShell/clear',success:function(responce){load_wrapper_form();}})}
 
 $( document ).ready(function() {
-    load_scripts();
-    $('#_wrapper').bind('click keyup', update_url);
-    $('#_script').bind('click keyup', update_url);
+    load_wrapper_form();
+
+    $('#_wrapper').on('change', function(e){var wrapper = $(this).val(); localStorage['wrapper'] = wrapper; load_script_form(wrapper);});
+    $('#_script').on('change', function(e){var script = $(this).val(); localStorage['script'] = script; update_url()});
+    
     $('#Params').bind('click keyup', put_to_body);
     $('._btn_add_param').bind('click', add_param);
     $('._btn_del_param').bind('click', del_param);
     $('._btn_send').bind('click', send_body);
     $('._btn_copy').bind('click', write_to_clip);
+    $('._btn_reload').bind('click', cache_reload);
+    $('._btn_clear').bind('click', cache_clear);
 });

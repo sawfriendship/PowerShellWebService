@@ -22,21 +22,21 @@
         <!-- LEFT -->
         <div id="LEFT" class="col-sm-5 col-md-4 col-xs-4" style="z-index:2">
             <div class="mb-3">
-                @* <label for="_wrapper" class="form-label">Wrapper</label>
-                <input type="text" class="form-control" id="_wrapper" placeholder="Wrapper" value="ExampleWrapper">
-                <label for="_script" class="form-label">Script</label>
-                <input type="text" class="form-control" id="_script" placeholder="Script" value="ExampleScript"> *@
+                <form>
+                    <label for="_wrapper" class="form-label">Wrapper</label>
+                    <select id="_wrapper" name="_wrapper" class="form-select"></select>
 
-                <label for="_wrapper" class="form-label">Wrapper</label>
-                <select id="_wrapper" name="Property" class="form-select"></select>
-
-                <label for="_script" class="form-label">Script</label>
-                <select id="_script" name="Value" class="form-select"></select>
-            
+                    <label for="_script" class="form-label">Script</label>
+                    <select id="_script" name="_script" class="form-select" disabled></select>
+                </form>
+            </div>
+            <div class="mb-3">
+                <button type="button" class="_btn_reload btn btn-dark btn-outline-success" style="width:49%">Reload Cache</button>
+                <button type="button" class="_btn_clear btn btn-dark btn-outline-danger" style="width:49%">Clear Cache</button>
             </div>
             <div class="mb-3">
                 <span>Params</span>
-                <button type="button" class="btn btn-dark _btn_add_param" style="width:100%">Add</button>
+                <button type="button" class="_btn_add_param btn btn-outline-dark" style="width:100%">Add</button>
             </div>
 
             <div id="Params"></div>
@@ -46,9 +46,10 @@
             <div class="mb-3">
                 <label for="_body" class="form-label">Body</label>
                 <input id="_body" class="form-control bg-dark text-light" placeholder="Body">
-                <a id="pwsh_url" target="_blank" href=""></a>
+                <a id="pwsh_url" target="_blank" href="/PowerShell/"></a>
             </div>
             <div class="mb-3">
+
                 <div id="SendParam" class="input-group">
                     <span class="input-group-text">Depth</span>
                     <input name="Depth" type="number" aria-label="Depth" placeholder="Depth" value="4" class="form-control _depth">
@@ -65,8 +66,8 @@
                     </select>
                     <button class="btn btn-outline-dark _btn_send" method="GET" type="button">GET</button>
                     <button class="btn btn-outline-dark _btn_send" method="POST" type="button">POST</button>
-                    <br>
                 </div>
+
                     <br>
                 <label for="_result" class="form-label">Result</label>
                 <div id="Result" class="mb-3">

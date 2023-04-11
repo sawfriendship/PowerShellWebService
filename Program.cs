@@ -26,7 +26,6 @@ WebAppBuilder.Services.AddRazorPages();
 
 await using var app = WebAppBuilder.Build();
 
-
 bool IsDevelopment = WebAppConfig.GetValue("IsDevelopment", false)!;
 string DateTimeLogFormat = WebAppConfig.GetValue("DateTimeLogFormat", "yyyy-MM-dd HH:mm:ss")!;
 
@@ -76,8 +75,6 @@ app.Map("/PowerShell/{Wrapper}", async (string Wrapper, HttpContext Context) =>
 
 app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, HttpContext Context) =>
     {
-        Context.Response.Headers["Content-Type"] = "application/json; charset=utf-8";
-
         Dictionary<String, String> Query = Context.Request.Query.ToDictionary(x => x.Key.ToUpper().ToString(), x => x.Value.ToString());
         Dictionary<String, String> Headers = Context.Request.Headers.ToDictionary(x => x.Key.ToUpper().ToString(), x => x.Value.ToString());
 
@@ -87,6 +84,7 @@ app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, 
         using var streamReader = new StreamReader(Context.Request.Body, encoding: System.Text.Encoding.UTF8);
         string Body = await streamReader.ReadToEndAsync();
         string pwsh_result = PSScriptRunner(Wrapper, Script, Query, Body, Depth, Context);
+        Context.Response.Headers["Content-Type"] = "application/json; charset=utf-8";
         await Context.Response.WriteAsync(pwsh_result);
     }
 );
@@ -319,8 +317,8 @@ int IvokeSqlWithParam(string ConnectionString, string Query, OrderedDictionary P
     SqlConnection Connection = new SqlConnection(ConnectionString);
     SqlCommand Command = new SqlCommand(Query, Connection);
     int id = 0;
-    foreach (var Param_ in Params.Keys) {
-        Command.Parameters.AddWithValue($"@{Param_!.ToString().TrimStart('@')}",Params[Param_]);
+    foreach (string Param_ in Params.Keys) {
+        Command.Parameters.AddWithValue($"@{Param_.TrimStart('@')}",Params[Param_]);
     }
     try {
         Connection.Open();
