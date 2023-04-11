@@ -1,5 +1,5 @@
 {
-  "IsDevelopment": false,
+  "IsDevelopment": true,
   "ExecutionPolicy": "Unrestricted",
   "DateTimeLogFormat": "yyyy-MM-dd HH:mm:ss",
   "Depth": 4,
