@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net7.0-windows</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 	<!-- <PublishSingleFile>true</PublishSingleFile> -->
@@ -45,6 +45,8 @@
 	<Reference Include="Microsoft.Bcl.AsyncInterfaces"><HintPath>C:\Program Files\PowerShell\7\Microsoft.Bcl.AsyncInterfaces.dll</HintPath></Reference>
 	<Reference Include="Microsoft.CodeAnalysis.CSharp"><HintPath>C:\Program Files\PowerShell\7\Microsoft.CodeAnalysis.CSharp.dll</HintPath></Reference>
 	<Reference Include="Microsoft.CodeAnalysis"><HintPath>C:\Program Files\PowerShell\7\Microsoft.CodeAnalysis.dll</HintPath></Reference>
+	<Reference Include="Microsoft.CSharp"><HintPath>C:\Program Files\PowerShell\7\Microsoft.CSharp.dll</HintPath></Reference>
+	<Reference Include="Microsoft.Extensions.ObjectPool"><HintPath>C:\Program Files\PowerShell\7\Microsoft.Extensions.ObjectPool.dll</HintPath></Reference>
 	<Reference Include="Microsoft.Management.Infrastructure.CimCmdlets"><HintPath>C:\Program Files\PowerShell\7\Microsoft.Management.Infrastructure.CimCmdlets.dll</HintPath></Reference>
 	<Reference Include="Microsoft.Management.Infrastructure"><HintPath>C:\Program Files\PowerShell\7\Microsoft.Management.Infrastructure.dll</HintPath></Reference>
 	<Reference Include="Microsoft.Management.Infrastructure.Native"><HintPath>C:\Program Files\PowerShell\7\Microsoft.Management.Infrastructure.Native.dll</HintPath></Reference>
@@ -56,12 +58,17 @@
 	<Reference Include="Microsoft.PowerShell.MarkdownRender"><HintPath>C:\Program Files\PowerShell\7\Microsoft.PowerShell.MarkdownRender.dll</HintPath></Reference>
 	<Reference Include="Microsoft.PowerShell.SDK"><HintPath>C:\Program Files\PowerShell\7\Microsoft.PowerShell.SDK.dll</HintPath></Reference>
 	<Reference Include="Microsoft.PowerShell.Security"><HintPath>C:\Program Files\PowerShell\7\Microsoft.PowerShell.Security.dll</HintPath></Reference>
+	<Reference Include="Microsoft.VisualBasic.Core"><HintPath>C:\Program Files\PowerShell\7\Microsoft.VisualBasic.Core.dll</HintPath></Reference>
 	<Reference Include="Microsoft.VisualBasic"><HintPath>C:\Program Files\PowerShell\7\Microsoft.VisualBasic.dll</HintPath></Reference>
+	<Reference Include="Microsoft.Win32.Primitives"><HintPath>C:\Program Files\PowerShell\7\Microsoft.Win32.Primitives.dll</HintPath></Reference>
 	<Reference Include="Microsoft.Win32.Registry.AccessControl"><HintPath>C:\Program Files\PowerShell\7\Microsoft.Win32.Registry.AccessControl.dll</HintPath></Reference>
+	<Reference Include="Microsoft.Win32.Registry"><HintPath>C:\Program Files\PowerShell\7\Microsoft.Win32.Registry.dll</HintPath></Reference>
 	<Reference Include="Microsoft.Win32.SystemEvents"><HintPath>C:\Program Files\PowerShell\7\Microsoft.Win32.SystemEvents.dll</HintPath></Reference>
 	<Reference Include="Microsoft.WSMan.Management"><HintPath>C:\Program Files\PowerShell\7\Microsoft.WSMan.Management.dll</HintPath></Reference>
 	<Reference Include="Microsoft.WSMan.Runtime"><HintPath>C:\Program Files\PowerShell\7\Microsoft.WSMan.Runtime.dll</HintPath></Reference>
+	<Reference Include="mscorlib"><HintPath>C:\Program Files\PowerShell\7\mscorlib.dll</HintPath></Reference>
 	<Reference Include="Namotion.Reflection"><HintPath>C:\Program Files\PowerShell\7\Namotion.Reflection.dll</HintPath></Reference>
+	<Reference Include="netstandard"><HintPath>C:\Program Files\PowerShell\7\netstandard.dll</HintPath></Reference>
 	<Reference Include="Newtonsoft.Json"><HintPath>C:\Program Files\PowerShell\7\Newtonsoft.Json.dll</HintPath></Reference>
 	<Reference Include="NJsonSchema"><HintPath>C:\Program Files\PowerShell\7\NJsonSchema.dll</HintPath></Reference>
 	<Reference Include="pwsh"><HintPath>C:\Program Files\PowerShell\7\pwsh.dll</HintPath></Reference>
@@ -108,6 +115,7 @@
 	<Reference Include="System.DirectoryServices.AccountManagement"><HintPath>C:\Program Files\PowerShell\7\System.DirectoryServices.AccountManagement.dll</HintPath></Reference>
 	<Reference Include="System.DirectoryServices"><HintPath>C:\Program Files\PowerShell\7\System.DirectoryServices.dll</HintPath></Reference>
 	<Reference Include="System.DirectoryServices.Protocols"><HintPath>C:\Program Files\PowerShell\7\System.DirectoryServices.Protocols.dll</HintPath></Reference>
+	<Reference Include="System"><HintPath>C:\Program Files\PowerShell\7\System.dll</HintPath></Reference>
 	<Reference Include="System.Drawing.Common"><HintPath>C:\Program Files\PowerShell\7\System.Drawing.Common.dll</HintPath></Reference>
 	<Reference Include="System.Drawing.Design"><HintPath>C:\Program Files\PowerShell\7\System.Drawing.Design.dll</HintPath></Reference>
 	<Reference Include="System.Drawing"><HintPath>C:\Program Files\PowerShell\7\System.Drawing.dll</HintPath></Reference>
