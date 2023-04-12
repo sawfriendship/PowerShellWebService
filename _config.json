@@ -13,14 +13,13 @@
     "ErrorView": "NormalView",
     "FormatEnumerationLimit": 10,
     "OFS": ",",
-    "_test_": 42
+    "TestVariable": 42
   },
   "CachedVariables": [
-    "Credential",
-    "StartUp"
+    "Credential"
   ],
   "SqlLogging": {
-    "Enabled": true,
+    "Enabled": false,
     "AbortScriptOnFailure": true,
     "Table": "Log",
     "ConnectionString": "Server=dev;Database=PwSh;Integrated Security=true;Encrypt=false;Trusted_Connection=true;Connection Timeout=3"

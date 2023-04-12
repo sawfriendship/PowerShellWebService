@@ -50,7 +50,7 @@ string SqlTable = WebAppConfig.GetValue("SqlLogging:Table", "Log")!;
 
 if (SqlLoggingEnabled) {
     OrderedDictionary SqlLog = new OrderedDictionary();
-    string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [UserName] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
+    string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
     IvokeSqlWithParam(SqlConnectionString,SqlQuery,SqlLog);
 }
 
@@ -124,8 +124,8 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         SqlLog["Script"] = Script;
         SqlLog["Body"] = Body;
         SqlLog["UserName"] = Context.User.Identity.Name;
-
-        string SqlQuery = $"INSERT INTO {SqlTable} ([Method],[Wrapper],[Script],[Body],[UserName]) OUTPUT INSERTED.ID VALUES(@Method,@Wrapper,@Script,@Body,@UserName)";
+        SqlLog["IPAddress"] = Context.Connection.RemoteIpAddress.ToString();
+        string SqlQuery = $"INSERT INTO {SqlTable} ([Method],[Wrapper],[Script],[Body],[UserName],[IPAddress]) OUTPUT INSERTED.ID VALUES(@Method,@Wrapper,@Script,@Body,@UserName,@IPAddress)";
         SqlLogID = IvokeSqlWithParam(SqlConnectionString,SqlQuery,SqlLog);
     }
 

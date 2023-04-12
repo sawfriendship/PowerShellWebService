@@ -5,8 +5,6 @@ param(
     [System.Object]$Context
 )
 
-if (!$Global:StartUp) {$Global:StartUp = Get-Date}
-
 if ($Context.Request.Method -eq 'GET') {
 	[hashtable]$Params = $Query
 } else {
@@ -16,5 +14,3 @@ if ($Context.Request.Method -eq 'GET') {
 Set-Alias -Name 'Script' -Value $ScriptFile
 
 Script @Params
-
-[gc]::collect()

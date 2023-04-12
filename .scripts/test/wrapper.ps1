@@ -5,7 +5,12 @@ param(
     [System.Object]$Context
 )
 
+# Using checks
+. $PSScriptRoot\middleware\is_localhost.ps1
+
+# Using global var, that configured in CachedVariables section of config.json file
 if (!$Global:StartUp) {$Global:StartUp = Get-Date}
+
 
 if ($Context.Request.Method -eq 'GET') {
 	[hashtable]$Params = $Query
