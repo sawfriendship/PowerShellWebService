@@ -3,7 +3,7 @@
   "ExecutionPolicy": "Unrestricted",
   "DateTimeLogFormat": "yyyy-MM-dd HH:mm:ss",
   "Depth": 4,
-  "ScriptRoot": ".\\_scripts",
+  "ScriptRoot": ".\\.scripts",
   "Variables": {
     "ErrorActionPreference": "Continue",
     "WarningPreference": "Continue",
