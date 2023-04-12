@@ -2,66 +2,36 @@
     "version": "0.2.0",
     "configurations": [
         {
-            // Use IntelliSense to find out which attributes exist for C# debugging
-            // Use hover for the description of the existing attributes
-            // For further information visit https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md
-            "name": "build",
+            "name": ".NET Core Launch (console)",
             "type": "coreclr",
-            // "request": "launch",
+            "request": "launch",
             "preLaunchTask": "build",
-            // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/bin/Debug/net7.0/PowerShellWebService.dll",
+            "program": "${workspaceFolder}/bin/Debug/net7.0/<project-name.dll>",
             "args": [],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
-            // Enable launching a web browser when ASP.NET Core starts. For more information: https://aka.ms/VSCode-CS-LaunchJson-WebBrowser
-            // "serverReadyAction": {
-            //     "action": "openExternally",
-            //     "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
-            // },
-            "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development",
-                "DOTNET_CLI_FORCE_UTF8_ENCODING": "1",
-                "DOTNET_SERVICING": "${workspaceFolder}/bin/Debug/net7.0/publish/runtime"
-            },
-            "sourceFileMap": {
-                "/Views": "${workspaceFolder}/Views"
-            }
+            "console": "internalConsole"
         },
         {
-            "name": "publish",
+            "name": ".NET Core Launch (web)",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "publish",
-            // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/bin/Debug/net7.0/publish/PowerShellWebService.dll",
-            // "args": ["publish","-c","Release","-r","win-x64","--no-restore","--no-self-contained"],
-            "args": ["publish","-c","Release","-r","win-x64","--no-self-contained"],
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/bin/Debug/net7.0/<project-name.dll>",
+            "args": [],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
-            // Enable launching a web browser when ASP.NET Core starts. For more information: https://aka.ms/VSCode-CS-LaunchJson-WebBrowser
-            // "serverReadyAction": {
-            //     "action": "openExternally",
-            //     "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
-            //     "uriFormat": "http://localhost:%s"
-            // },
+            "serverReadyAction": {
+                "action": "openExternally",
+                "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+            },
             "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development",
-                "DOTNET_CLI_FORCE_UTF8_ENCODING": "1"
+                "ASPNETCORE_ENVIRONMENT": "Development"
             },
             "sourceFileMap": {
                 "/Views": "${workspaceFolder}/Views"
             }
-        },
-        {
-            "name": ".NET Core Attach",
-            "type": "coreclr",
-            "request": "attach"
-        },
-        {
-            "name": ".NET Core Attach",
-            "type": "coreclr",
-            "request": "attach"
         }
+
     ]
 }

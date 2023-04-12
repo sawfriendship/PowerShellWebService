@@ -34,7 +34,7 @@ string DateTimeLogFormat = WebAppConfig.GetValue("DateTimeLogFormat", "yyyy-MM-d
 app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, StartUp");
 
 if (IsDevelopment) { app.UseExceptionHandler("/Error"); }
-// app.UseStaticFiles();
+app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthorization();
 app.MapRazorPages();
@@ -50,7 +50,7 @@ string SqlTable = WebAppConfig.GetValue("SqlLogging:Table", "Log")!;
 
 if (SqlLoggingEnabled) {
     OrderedDictionary SqlLog = new OrderedDictionary();
-    string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
+    string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [UserName] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
     IvokeSqlWithParam(SqlConnectionString,SqlQuery,SqlLog);
 }
 
@@ -123,7 +123,22 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         SqlLog["Wrapper"] = Wrapper;
         SqlLog["Script"] = Script;
         SqlLog["Body"] = Body;
-        string SqlQuery = $"INSERT INTO {SqlTable} ([Method],[Wrapper],[Script],[Body]) OUTPUT INSERTED.ID VALUES(@Method,@Wrapper,@Script,@Body)";
+        SqlLog["UserName"] = Context.User.Identity.Name;
+
+        // Context.User.Identity.Name
+    //     User": {
+    // "Identity": {
+    //   "AuthenticationType": "Basic",
+    //   "ImpersonationLevel": "None",
+    //   "IsAuthenticated": true,
+    //   "IsGuest": false,
+    //   "IsSystem": false,
+    //   "IsAnonymous": false,
+    //   "Name": "NET\\saw-friendship",
+
+
+
+        string SqlQuery = $"INSERT INTO {SqlTable} ([Method],[Wrapper],[Script],[Body],[UserName]) OUTPUT INSERTED.ID VALUES(@Method,@Wrapper,@Script,@Body,@UserName)";
         SqlLogID = IvokeSqlWithParam(SqlConnectionString,SqlQuery,SqlLog);
     }
 
