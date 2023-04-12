@@ -125,19 +125,6 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         SqlLog["Body"] = Body;
         SqlLog["UserName"] = Context.User.Identity.Name;
 
-        // Context.User.Identity.Name
-    //     User": {
-    // "Identity": {
-    //   "AuthenticationType": "Basic",
-    //   "ImpersonationLevel": "None",
-    //   "IsAuthenticated": true,
-    //   "IsGuest": false,
-    //   "IsSystem": false,
-    //   "IsAnonymous": false,
-    //   "Name": "NET\\saw-friendship",
-
-
-
         string SqlQuery = $"INSERT INTO {SqlTable} ([Method],[Wrapper],[Script],[Body],[UserName]) OUTPUT INSERTED.ID VALUES(@Method,@Wrapper,@Script,@Body,@UserName)";
         SqlLogID = IvokeSqlWithParam(SqlConnectionString,SqlQuery,SqlLog);
     }
