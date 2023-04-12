@@ -1,8 +1,8 @@
 .vs
+.vscode
 bin
 obj
 Properties
 *.bak
+*.zip
 *.dib
-_wrappers/_*
-_scripts/_*
