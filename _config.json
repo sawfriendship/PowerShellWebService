@@ -16,7 +16,8 @@
     "TestVariable": 42
   },
   "CachedVariables": [
-    "Credential"
+    "Credential",
+    "StartUp"
   ],
   "SqlLogging": {
     "Enabled": false,
