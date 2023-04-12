@@ -143,7 +143,7 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
     string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
 
 
-    if (AbortScriptOnSqlFailure && SqlLogID == 0) {
+    if (SqlLoggingEnabled && AbortScriptOnSqlFailure && SqlLogID == 0) {
         success = false;
         error = $"SQL Failure";
     } else if (!ScriptCache.ContainsKey(Wrapper)) {
