@@ -18,6 +18,8 @@ using System.Reflection;
 using System.Linq;
 using System.Data.SqlClient;
 
+string ROOT_DIR = AppContext.BaseDirectory;
+
 var WebAppConfig = new ConfigurationBuilder().AddJsonFile("_config.json", optional: true, reloadOnChange: true).Build();
 var WebAppBuilder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
 
@@ -32,12 +34,11 @@ string DateTimeLogFormat = WebAppConfig.GetValue("DateTimeLogFormat", "yyyy-MM-d
 app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, StartUp");
 
 if (IsDevelopment) { app.UseExceptionHandler("/Error"); }
-app.UseStaticFiles();
+// app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthorization();
 app.MapRazorPages();
 
-string ROOT_DIR = AppContext.BaseDirectory;
 string ScriptRoot = WebAppConfig.GetValue("ScriptRoot", Path.Join(ROOT_DIR, "_scripts"))!;
 var ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
 List<string> CachedVariables = WebAppConfig.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();

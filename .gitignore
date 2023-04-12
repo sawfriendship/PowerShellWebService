@@ -2,7 +2,6 @@
 .vscode
 bin
 obj
-Properties
 *.bak
 *.zip
 *.dib
