@@ -25,7 +25,7 @@ WebAppBuilder.Logging.AddJsonConsole();
 WebAppBuilder.Services.AddRazorPages();
 
 await using var app = WebAppBuilder.Build();
-
+string ResponseContentType = "application/json; charset=utf-8";
 bool IsDevelopment = WebAppConfig.GetValue("IsDevelopment", false)!;
 string DateTimeLogFormat = WebAppConfig.GetValue("DateTimeLogFormat", "yyyy-MM-dd HH:mm:ss")!;
 
@@ -34,6 +34,7 @@ app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, StartUp"
 if (IsDevelopment) { app.UseExceptionHandler("/Error"); }
 app.UseStaticFiles();
 app.UseRouting();
+app.UseAuthorization();
 app.MapRazorPages();
 
 string ROOT_DIR = AppContext.BaseDirectory;
@@ -68,7 +69,7 @@ app.Map("/PowerShell/", async (HttpContext Context) =>
     {
         var WrapperDict = ScriptCache.ToDictionary(x => x.Key, x => x.Value.Keys.ToList());
         string OutputString = ConvertToJson(WrapperDict,1);
-        Context.Response.Headers["Content-Type"] = "application/json; charset=utf-8";
+        Context.Response.Headers["Content-Type"] = ResponseContentType;
         await Context.Response.WriteAsync(OutputString);
     }
 );
@@ -78,7 +79,7 @@ app.Map("/PowerShell/{Wrapper}", async (string Wrapper, HttpContext Context) =>
         List<string> Scripts = new List<string>();
         if (ScriptCache.ContainsKey(Wrapper)) {Scripts = ScriptCache[Wrapper].Keys.ToList();}
         string OutputString = ConvertToJson(Scripts,1);
-        Context.Response.Headers["Content-Type"] = "application/json; charset=utf-8";
+        Context.Response.Headers["Content-Type"] = ResponseContentType;
         await Context.Response.WriteAsync(OutputString);
     }
 );
@@ -94,7 +95,7 @@ app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, 
         using var streamReader = new StreamReader(Context.Request.Body, encoding: System.Text.Encoding.UTF8);
         string Body = await streamReader.ReadToEndAsync();
         string pwsh_result = PSScriptRunner(Wrapper, Script, Query, Body, Depth, Context);
-        Context.Response.Headers["Content-Type"] = "application/json; charset=utf-8";
+        Context.Response.Headers["Content-Type"] = ResponseContentType;
         await Context.Response.WriteAsync(pwsh_result);
     }
 );
@@ -317,7 +318,7 @@ string ConvertToJson(object data, int maxDepth = 4, bool enumsAsStrings = true, 
     } catch (Exception e) {
         if (RaiseError) {
             app.Logger.LogError($"{DateTime.Now.ToString(DateTimeLogFormat)}, ConvertToJson Error: '{e}'");
-            throw e;
+            throw;
         }
     }
     return Result;
@@ -361,7 +362,7 @@ List<String> SearchFiles(string Path, string Extension, bool RaiseError) {
         }
     } catch (Exception e) {
         if (RaiseError) {
-            throw e;
+            throw;
         } else {
             return new List<String>();
         }
