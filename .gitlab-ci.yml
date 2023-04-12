@@ -12,7 +12,8 @@ deploy_to_repository:
    - (Get-Date).ToString('o')
    - $Location = Get-Location
    - dotnet.exe add package runtime.native.System.Data.SqlClient.sni
-   - dotnet.exe build --no-restore
+   - #dotnet.exe build --no-restore
+   - dotnet.exe publish -c Release -r win-x64 -p:PublishReadyToRun=true --no-self-contained
    - Import-Module IISAdministration
    - Get-IISSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
    - Write-Host $Location -ForegroundColor Yellow
