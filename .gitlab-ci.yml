@@ -12,7 +12,7 @@ deploy_to_repository:
    - (Get-Date).ToString('o')
    - $Location = Get-Location
    - dotnet.exe add package runtime.native.System.Data.SqlClient.sni
-   - dotnet.exe --build --runtime win-x64
+   - dotnet.exe build
    - Import-Module IISAdministration
    - Get-IISSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
    - Write-Host $Location -ForegroundColor Yellow
