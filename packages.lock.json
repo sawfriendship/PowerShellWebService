@@ -1,7 +1,7 @@
 {
   "version": 1,
   "dependencies": {
-    "net7.0": {
+    "net7.0-windows7.0": {
       "runtime.native.System.Data.SqlClient.sni": {
         "type": "Direct",
         "requested": "[4.7.0, )",

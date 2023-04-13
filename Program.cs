@@ -16,7 +16,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration.Json;
 using System.Reflection;
 using System.Linq;
-using System.Data.SqlClient;
+using System.Data.Odbc;
+using System.Data.Common;
 
 string ROOT_DIR = AppContext.BaseDirectory;
 
@@ -41,7 +42,7 @@ app.MapRazorPages();
 
 string ScriptRoot = WebAppConfig.GetValue("ScriptRoot", Path.Join(ROOT_DIR, "_scripts"))!;
 var ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
-List<string> CachedVariables = WebAppConfig.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
+var CachedVariables = WebAppConfig.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
 var PSRunspaceVariables = WebAppConfig.GetSection("Variables").GetChildren().ToList();
 bool SqlLoggingEnabled = WebAppConfig.GetValue("SqlLogging:Enabled", false);
 bool AbortScriptOnSqlFailure = WebAppConfig.GetValue("SqlLogging:AbortScriptOnFailure", true);
@@ -49,9 +50,8 @@ string SqlConnectionString = WebAppConfig.GetValue("SqlLogging:ConnectionString"
 string SqlTable = WebAppConfig.GetValue("SqlLogging:Table", "Log")!;
 
 if (SqlLoggingEnabled) {
-    OrderedDictionary SqlLog = new OrderedDictionary();
     string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
-    IvokeSqlWithParam(SqlConnectionString,SqlQuery,SqlLog);
+    SqlExecuteNonQuery(SqlConnectionString,SqlQuery);
 }
 
 ScriptLoader();
@@ -126,7 +126,7 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         SqlLog["UserName"] = Context.User.Identity.Name;
         SqlLog["IPAddress"] = Context.Connection.RemoteIpAddress.ToString();
         string SqlQuery = $"INSERT INTO {SqlTable} ([Method],[Wrapper],[Script],[Body],[UserName],[IPAddress]) OUTPUT INSERTED.ID VALUES(@Method,@Wrapper,@Script,@Body,@UserName,@IPAddress)";
-        SqlLogID = IvokeSqlWithParam(SqlConnectionString,SqlQuery,SqlLog);
+        SqlLogID = SqlExecuteQueryWithParam(SqlConnectionString,SqlQuery,SqlLog);
     }
 
     var PSObjects = new Collection<PSObject>();
@@ -306,7 +306,7 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         SqlLog["StreamInformation"] = InformationListJson;
         SqlLog["StreamVerbose"] = VerboseListJson;
         string SqlQuery = $"UPDATE {SqlTable} SET [EndDate]=@EndDate,[Success]=@Success,[PSObjects]=@PSObjects,[StreamError]=@StreamError,[StreamWarning]=@StreamWarning,[StreamInformation]=@StreamInformation,[StreamVerbose]=@StreamVerbose,[HadErrors]=@HadErrors,[Error]=@Error WHERE ID = {SqlLogID}";
-        IvokeSqlWithParam(SqlConnectionString,SqlQuery,SqlLog);
+        SqlExecuteQueryWithParam(SqlConnectionString,SqlQuery,SqlLog);
     }
 
     return PSOutputString;
@@ -327,25 +327,79 @@ string ConvertToJson(object data, int maxDepth = 4, bool enumsAsStrings = true, 
     return Result;
 }
 
-int IvokeSqlWithParam(string ConnectionString, string Query, OrderedDictionary Params) {
-    SqlConnection Connection = new SqlConnection(ConnectionString);
-    SqlCommand Command = new SqlCommand(Query, Connection);
-    int id = 0;
-    foreach (string Param_ in Params.Keys) {
-        Command.Parameters.AddWithValue($"@{Param_.TrimStart('@')}",Params[Param_]);
-    }
-    try {
-        Connection.Open();
-        using (SqlDataReader DataReader = Command.ExecuteReader()) {
-            if (DataReader.Read()) {
-                id = Convert.ToInt32(DataReader["id"]);
-            }
+// int IvokeSqlWithParam(string ConnectionString, string Query, OrderedDictionary Params) {
+//     SqlConnection Connection = new SqlConnection(ConnectionString);
+//     SqlCommand Command = new SqlCommand(Query, Connection);
+//     int id = 0;
+//     foreach (string Param_ in Params.Keys) {
+//         Command.Parameters.AddWithValue($"@{Param_.TrimStart('@')}",Params[Param_]);
+//     }
+//     try {
+//         Connection.Open();
+//         using (SqlDataReader DataReader = Command.ExecuteReader()) {
+//             if (DataReader.Read()) {
+//                 id = Convert.ToInt32(DataReader["id"]);
+//             }
+//         }
+//         app.Logger.LogInformation($"SQL Write Success, id: {id}");
+//     } catch (Exception e) {
+//         app.Logger.LogError($"SQL Write Error: {e}");
+//     } finally {
+//         Connection.Close();
+//     }
+
+//     return id;
+// }
+
+void SqlExecuteNonQuery(string ConnectionString, string Query) {
+    using (var Connection = new OdbcConnection(ConnectionString)) {
+        try {
+            var Command = new OdbcCommand(Query, Connection);
+            Connection.Open();
+            Command.ExecuteNonQuery();
+            app.Logger.LogInformation($"SQL Write Success");
+        } catch (Exception e) {
+            app.Logger.LogError($"SQL Write Error: {e}");
+        } finally {
+            Connection.Close();
         }
-        app.Logger.LogInformation($"SQL Write Success, id: {id}");
-    } catch (Exception e) {
-        app.Logger.LogError($"SQL Write Error: {e}");
-    } finally {
-        Connection.Close();
+    }
+}
+
+int SqlExecuteQueryWithParam(string ConnectionString, string Query, OrderedDictionary Params) {
+    int id = 0;
+    using (var Connection = new OdbcConnection(ConnectionString)) {
+
+        try {
+            var Command = new OdbcCommand(Query, Connection);
+            
+            foreach (string Param_ in Params.Keys) {
+                Command.Parameters.AddWithValue($"@{Param_.ToString().TrimStart('@')}",Params[Param_]);
+            }
+
+            Connection.Open();
+            var DataReader = Command.ExecuteReader();
+
+            while (DataReader.Read()) {
+                id = DataReader.GetInt32(0);
+            }
+
+            // if (DataReader.Read()) {
+            //     id = DataReader.GetInt32(0);
+            // }
+
+            // if (DataReader.Rea()) {
+            //     id = Convert.ToInt32(DataReader["id"]);
+            // } else {
+            //     id = 0;
+            // }
+            DataReader.Close();
+            app.Logger.LogInformation($"SQL Write Success, id: {id}");
+        } catch (Exception e) {
+            app.Logger.LogError($"SQL Write Error: {e}");
+        } finally {
+            Connection.Close();
+        }
     }
 
     return id;
@@ -408,4 +462,3 @@ void ClearCache() {
 }
 
 await app.RunAsync();
-

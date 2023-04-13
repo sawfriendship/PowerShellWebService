@@ -23,6 +23,6 @@
     "Enabled": false,
     "AbortScriptOnFailure": true,
     "Table": "Log",
-    "ConnectionString": "Server=dev;Database=PwSh;Integrated Security=true;Encrypt=false;Trusted_Connection=true;Connection Timeout=3"
+    "ConnectionString": "Driver={ODBC Driver 18 for SQL Server};Server=dev;Database=PwSh;Authentication=ActiveDirectoryIntegrated;Encrypt=no;Connection Timeout=3;"
   }
 }
