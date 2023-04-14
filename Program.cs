@@ -127,19 +127,6 @@ app.Map("/PowerShell/clear", async (HttpContext Context) =>
 
 string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> Query, string Body, int Depth, HttpContext Context) {
     Dictionary<string,object> SqlLogOutput = new();
-    if (SqlLoggingEnabled) {
-        Dictionary<string,object> SqlLogParam = new()
-        {
-            ["Method"] = Context.Request.Method,
-            ["Wrapper"] = Wrapper,
-            ["Script"] = Script,
-            ["Body"] = Body,
-            ["IPAddress"] = $"{Context.Connection.RemoteIpAddress}",
-        };
-        if (Context.User.Identity.Name is not null) {SqlLogParam["UserName"] = Context.User.Identity.Name;}
-        SqlLogOutput = SqlHelper(SqlTable,SqlLogParam,"INSERT",SqlConnectionString,PrimaryKey:"id");
-    }
-
     Collection<PSObject> PSObjects = new();
     OrderedDictionary ResultTable = new();
     OrderedDictionary Streams = new();
@@ -152,9 +139,28 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
     bool HadErrors = false;
     string error = "";
     string PSOutputString = "";
-
     string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
     string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
+
+    if (SqlLoggingEnabled) {
+        Dictionary<string,object> SqlLogParam = new()
+        {
+            ["Method"] = Context.Request.Method,
+            ["Wrapper"] = Wrapper,
+            ["Script"] = Script,
+            ["Body"] = Body,
+            ["IPAddress"] = $"{Context.Connection.RemoteIpAddress}",
+        };
+        if (Context.User.Identity.Name is not null) {
+            SqlLogParam["UserName"] = Context.User.Identity.Name;
+        }
+        try {
+            SqlLogOutput = SqlHelper(SqlTable,SqlLogParam,"INSERT",SqlConnectionString,PrimaryKey:"id");
+        } catch (Exception e) {
+            Console.WriteLine(e.ToString());
+        }
+    }
+
 
 
     if (SqlLoggingEnabled && AbortScriptOnSqlFailure && SqlLogOutput.Count < 1) {
