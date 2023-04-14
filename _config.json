@@ -20,9 +20,9 @@
     "StartUp"
   ],
   "SqlLogging": {
-    "Enabled": false,
+    "Enabled": true,
     "AbortScriptOnFailure": true,
     "Table": "Log",
-    "ConnectionString": "Driver={ODBC Driver 18 for SQL Server};Server=dev;Database=PwSh;Authentication=ActiveDirectoryIntegrated;Encrypt=no;Connection Timeout=3;"
+    "ConnectionString": "Driver={ODBC Driver 18 for SQL Server};Server=dev;Database=PwSh;Authentication=ActiveDirectoryIntegrated;Encrypt=no;Connection Timeout=5;"
   }
 }
