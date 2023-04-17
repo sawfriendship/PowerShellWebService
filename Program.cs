@@ -50,10 +50,15 @@ bool AbortScriptOnSqlFailure = WebAppConfig.GetValue("SqlLogging:AbortScriptOnFa
 string SqlConnectionString = WebAppConfig.GetValue("SqlLogging:ConnectionString", "")!;
 string SqlTable = WebAppConfig.GetValue("SqlLogging:Table", "Log")!;
 
-// if (SqlLoggingEnabled) {
-//     string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
-//     SqlHelper(SqlTable,SqlConnectionString,SqlQuery);
-// }
+if (SqlLoggingEnabled) {
+    string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
+    var Connection = new OdbcConnection(SqlConnectionString);
+    var Command = new OdbcCommand(SqlQuery, Connection);
+    System.Data.Odbc.OdbcDataAdapter DataAdapter = new();
+    DataAdapter.SelectCommand = Command;
+    System.Data.DataSet DataSet = new();
+    DataAdapter.Fill(DataSet);
+}
 
 ScriptLoader();
 
@@ -328,14 +333,10 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         string InformationListJson = ConvertToJson(InformationList,3,true,true,false);
         string VerboseListJson = ConvertToJson(VerboseList,3,true,true,false);
 
-        var d = DateTime.Now;
-        // d = d.Date.AddMilliseconds(Convert.ToInt32(d.TimeOfDay.TotalMilliseconds));
-        d = d.Date.AddSeconds(Convert.ToInt32(d.TimeOfDay.TotalSeconds));
-
         Dictionary<string,object> SqlLogParam = new()
         {
             ["id"] = SqlLogOutput["id"],
-            ["EndDate"] = d,
+            ["EndDate"] = DateTime.Now,
             ["Error"] = error,
             ["Success"] = success,
             ["HadErrors"] = HadErrors,
@@ -386,14 +387,19 @@ Dictionary<string,object> SqlHelper(string SqlTable, Dictionary<string,object> P
     var Connection = new OdbcConnection(ConnectionString);
     var Command = new OdbcCommand(Query, Connection);
     foreach (string Key in Keys) {
-        Command.Parameters.AddWithValue(Key,Params[Key]);
+        var Value = Params[Key];
+        if (Value.GetType() == typeof(System.DateTime)) {
+            Command.Parameters.AddWithValue(Key,Value).Scale = 7;
+        } else {
+           Command.Parameters.AddWithValue(Key,Value);
+        }
     }
     if (Params.ContainsKey(PrimaryKey)) {Command.Parameters.AddWithValue(PrimaryKey,Params[PrimaryKey]);}
 
-    System.Data.Odbc.OdbcDataAdapter OdbcDataAdapter = new();
-    OdbcDataAdapter.SelectCommand = Command;
+    System.Data.Odbc.OdbcDataAdapter DataAdapter = new();
+    DataAdapter.SelectCommand = Command;
     System.Data.DataSet DataSet = new();
-    OdbcDataAdapter.Fill(DataSet);
+    DataAdapter.Fill(DataSet);
     if (!DataSet.HasErrors) {
         var Table = DataSet.Tables[0];
         var Columns = Table.Columns;
