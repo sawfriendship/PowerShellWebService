@@ -12,7 +12,7 @@ deploy_to_repository:
    - (Get-Date).ToString('o')
    - $Location = Get-Location
    - dotnet.exe publish -c Release -r win-x64 -p:PublishReadyToRun=true --no-self-contained
-   - Import-Module IISAdministration
+   - Import-Module IISAdministration -WarningAction:SilentlyContinue
    - Get-IISSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
    - Write-Host $Location -ForegroundColor Yellow
    - Get-ChildItem -Path $Location -Recurse | % {$_.FullName.replace($Location,'')}
