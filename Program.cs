@@ -1,6 +1,7 @@
 
 using System;
 using System.IO;
+using System.Security;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
@@ -19,6 +20,7 @@ using System.Reflection;
 using System.Linq;
 using System.Data.Odbc;
 using System.Data.Common;
+using System.Text.RegularExpressions;
 
 string ROOT_DIR = AppContext.BaseDirectory;
 
@@ -65,7 +67,8 @@ ScriptLoader();
 app.Map("/whoami", async (HttpContext Context) =>
     {
         var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
-        if (Headers.ContainsKey("Authorization")) { Headers["Authorization"] = "***"; }
+        string AuthorizationHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization").Select(x => x.Key).FirstOrDefault("");
+        if (Headers.ContainsKey(AuthorizationHeader)) { Headers[AuthorizationHeader] = "***"; }
 
         Dictionary<String, object> UserInfo = new()
         {
@@ -78,6 +81,13 @@ app.Map("/whoami", async (HttpContext Context) =>
         var result = ConvertToJson(UserInfo);
         Context.Response.Headers["Content-Type"] = ResponseContentType;
         await Context.Response.WriteAsync(result);
+    }
+);
+
+app.Map("/logoff", async (HttpContext Context) =>
+    {
+        Context.Response.StatusCode = 401;
+        await Context.Response.WriteAsync("logoff");;
     }
 );
 
@@ -102,11 +112,13 @@ app.Map("/PowerShell/{Wrapper}", async (string Wrapper, HttpContext Context) =>
 
 app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, HttpContext Context) =>
     {
-        var Query = Context.Request.Query.ToDictionary(x => x.Key.ToUpper().ToString(), x => x.Value.ToString());
-        var Headers = Context.Request.Headers.ToDictionary(x => x.Key.ToUpper().ToString(), x => x.Value.ToString());
+        var Query = Context.Request.Query.ToDictionary(x => x.Key, x => x.Value.ToString());
+        var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
 
         int Depth = WebAppConfig.GetValue("Depth", 4);
-        if (Headers.ContainsKey("DEPTH")) { if (int.TryParse(Headers["DEPTH"], out int Depth_)) { Depth = Depth_; } }
+        string DepthHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "depth").Select(x => x.Key).FirstOrDefault("");
+
+        if (DepthHeader.Length > 0) { if (int.TryParse(Headers[DepthHeader], out int Depth_)) { Depth = Depth_; } }
 
         var streamReader = new StreamReader(Context.Request.Body, encoding: System.Text.Encoding.UTF8);
         string Body = await streamReader.ReadToEndAsync();
@@ -146,7 +158,7 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
     string PSOutputString = "";
     string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
     string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
-
+    
     if (SqlLoggingEnabled) {
         Dictionary<string,object> SqlLogParam = new()
         {
@@ -166,7 +178,21 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         }
     }
 
-
+    PSCredential UserCredential = null!;
+    if (Context.User.Identity.AuthenticationType is not null && Context.User.Identity.AuthenticationType.ToString().ToLower() == "basic") {
+        var Encoding = System.Text.Encoding.GetEncoding("utf-8");
+        string Authorization = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization")
+            .Select(x => Regex.Replace(x.Value.ToString(),@"^basic\s*","",RegexOptions.IgnoreCase))
+            .Select(x => Encoding.GetString(Convert.FromBase64String(x)))
+            .FirstOrDefault("");
+        if (Authorization.Length > 0) {
+            string u = Authorization.Split(":")[0];
+            string p = Authorization.Split(":")[1];
+            var s = new System.Security.SecureString();
+            p.ToCharArray().ToList().ForEach(x => s.AppendChar(x));
+            UserCredential = new System.Management.Automation.PSCredential(u,s);
+        }
+    }
 
     if (SqlLoggingEnabled && AbortScriptOnSqlFailure && SqlLogOutput.Count < 1) {
         success = false;
@@ -194,6 +220,8 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         foreach (var _ in PSRunspaceVariables) {
             PSRunspace.SessionStateProxy.SetVariable(_.Key, _.Value);
         }
+
+        PSRunspace.SessionStateProxy.SetVariable("UserCredential", UserCredential);
 
         PowerShell PwSh = PowerShell.Create();
         PwSh.Runspace = PSRunspace;
