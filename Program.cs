@@ -22,7 +22,6 @@ using System.Linq;
 using System.Data.Odbc;
 using System.Data.Common;
 using System.Text.RegularExpressions;
-// using Microsoft.AspNetCore.Http;
 
 string ROOT_DIR = AppContext.BaseDirectory;
 
@@ -51,8 +50,8 @@ string ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR,
 var ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
 var CachedVariables = app.Configuration.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
 var PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren().ToList();
-bool SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
 string UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
+bool SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
 bool AbortScriptOnSqlFailure = app.Configuration.GetValue("SqlLogging:AbortScriptOnFailure", true);
 string SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
 string SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
@@ -90,6 +89,13 @@ app.Map("/whoami", async (HttpContext Context) =>
 );
 
 app.Map("/logoff", async (HttpContext Context) =>
+    {
+        Context.Response.StatusCode = 401;
+        await Context.Response.WriteAsync("logoff");
+    }
+);
+
+app.Map("/logout", async (HttpContext Context) =>
     {
         Context.Response.StatusCode = 401;
         await Context.Response.WriteAsync("logoff");
@@ -137,15 +143,29 @@ app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, 
 
 app.Map("/PowerShell/reload", async (HttpContext Context) =>
     {
-        ScriptLoader();
-        await Context.Response.WriteAsync("ok");
+        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
+        string response = "";
+        if (UserIsInRoleAdmin) {
+            response = "ok";
+            ScriptLoader();
+        } else {
+            response = "access denied";
+        }
+        await Context.Response.WriteAsync(response);
     }
 );
 
 app.Map("/PowerShell/clear", async (HttpContext Context) =>
     {
-        ClearCache();
-        await Context.Response.WriteAsync("ok");
+        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
+        string response = "";
+        if (UserIsInRoleAdmin) {
+            response = "ok";
+            ClearCache();
+        } else {
+            response = "access denied";
+        }
+        await Context.Response.WriteAsync(response);
     }
 );
 
@@ -402,6 +422,7 @@ string ConvertToJson(object data, int maxDepth = 4, bool enumsAsStrings = true, 
         Result = JsonObject.ConvertToJson(data, jsonContext);
     } catch (Exception e) {
         if (RaiseError) {
+            DateTimeLogFormat = app.Configuration.GetValue("DateTimeLogFormat", "yyyy-MM-dd HH:mm:ss")!;
             app.Logger.LogError($"{DateTime.Now.ToString(DateTimeLogFormat)}, ConvertToJson Error: '{e}'");
             throw;
         }
