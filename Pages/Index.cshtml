@@ -1,21 +1,18 @@
 ﻿@page
 @model IndexModel
+
 @{
     ViewData["Title"] = "Home page";
 }
+@* <h1>@ViewData["Title"]</h1> *@
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>
-        <b>Этот сервис предназначен для работы в качестве внутренней службы на веб-сервере для упрощения обмена данными с PowerShell.</b></br>
-        Он очень простой, потому что предназначен для тех, кому трудно разобраться в C#, но владеет другими языками и хочет получить мощность PowerShell</br>
-        <span style="color:#CC0000;">Не стоит публиковать его для пользователей! Вместо этого опубликуйте его на адресе 127.0.0.1 или на любом другом 127.0.0.*</span>,<br> если речь идёт о Windows, да, там так можно :-)</br>
-        После этого вы можете написать веб-сервис на вашем любимом языке и использовать PowerShellWebService внутри него,<br> это может быть Go, Python, PHP, Perl, Java, JavaScript или что-то еще на ваше усмотрение.<br>
-        И пожалуйста, не надо больше запускать PowerShell.exe и разбирать stdout,<br> ведь у него под капотом 6 потоков вывода вместо 2 и вы можете пропустить самое интересное :-) Смотрите ниже "Output Streams"<br>
-    </p>
-    <hr>
-    <p>Важно <a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_output_streams?view=powershell-7.3">About PowerShell Output Streams</a>.</p>
-    <p>Руководство <a href="https://learn.microsoft.com/ru-ru/aspnet/core/tutorials/publish-to-iis?view=aspnetcore-7.0">Публикация приложения ASP.NET Core в службах IIS</a>.</p>
-    <p>Руководство <a href="https://learn.microsoft.com/ru-ru/aspnet/core/tutorials/min-web-api?view=aspnetcore-7.0">Создание минимального API с помощью ASP.NET Core</a>.</p>
-    <p>Документация <a href="https://learn.microsoft.com/ru-ru/aspnet/core/?view=aspnetcore-7.0">ASP.NET</a>.</p>
-</div>
+@if (!@User.Identity.IsAuthenticated) {
+    <h3>Is not Authenticated!</h3>
+} else {
+    @if (@Model.UserIsInRoleUser) {
+        <p>UserIsInRoleUser</p>
+    }
+    @if (@Model.UserIsInRoleAdmin) {
+        <p>UserIsInRoleAdmin</p>
+    }
+}

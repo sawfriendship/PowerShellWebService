@@ -1,20 +1,28 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using System.Linq;
 
 namespace PowerShellWebService.Pages;
 
-public class PrivacyModel : PageModel
+public class ScriptRunnerModel : PageModel
 {
-    private readonly ILogger<PrivacyModel> _logger;
+    private readonly IConfiguration Configuration;
 
-    public PrivacyModel(ILogger<PrivacyModel> logger)
+    public ScriptRunnerModel(IConfiguration configuration)
     {
-        _logger = logger;
+        Configuration = configuration;
     }
+
+    public string UserName { get; private set; } = "%UserName%";
+    public bool UserIsInRoleAdmin { get; private set; } = false;
+    public bool UserIsInRoleUser { get; private set; } = false;
 
     public void OnGet()
     {
-        
+        var User = HttpContext.User;
+        UserName = HttpContext.User.Identity.Name;
+        UserIsInRoleAdmin = Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => HttpContext.User.IsInRole(x));
+        UserIsInRoleUser = Configuration.GetSection("Roles:User").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => HttpContext.User.IsInRole(x));
     }
 }
 

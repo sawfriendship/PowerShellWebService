@@ -1,4 +1,3 @@
-
 using System;
 using System.IO;
 using System.Security;
@@ -15,42 +14,48 @@ using Microsoft.PowerShell.Commands;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
 using System.Reflection;
 using System.Linq;
 using System.Data.Odbc;
 using System.Data.Common;
 using System.Text.RegularExpressions;
+// using Microsoft.AspNetCore.Http;
 
 string ROOT_DIR = AppContext.BaseDirectory;
 
-var WebAppConfig = new ConfigurationBuilder().AddJsonFile("_config.json", optional: true, reloadOnChange: true).Build();
 var WebAppBuilder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
-
 WebAppBuilder.Logging.AddJsonConsole();
 WebAppBuilder.Services.AddRazorPages();
+WebAppBuilder.Configuration
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables();
 
 await using var app = WebAppBuilder.Build();
+
 string ResponseContentType = "application/json; charset=utf-8";
-bool IsDevelopment = WebAppConfig.GetValue("IsDevelopment", false)!;
-string DateTimeLogFormat = WebAppConfig.GetValue("DateTimeLogFormat", "yyyy-MM-dd HH:mm:ss")!;
+string DateTimeLogFormat = app.Configuration.GetValue("DateTimeLogFormat", "yyyy-MM-dd HH:mm:ss")!;
 
 app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, StartUp");
 
-if (IsDevelopment) { app.UseExceptionHandler("/Error"); }
+if (System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development") { app.UseExceptionHandler("/Error"); }
+
 app.UseStaticFiles();
 app.UseRouting();
-app.UseAuthorization();
 app.MapRazorPages();
 
-string ScriptRoot = WebAppConfig.GetValue("ScriptRoot", Path.Join(ROOT_DIR, "_scripts"))!;
+string ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
 var ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
-var CachedVariables = WebAppConfig.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
-var PSRunspaceVariables = WebAppConfig.GetSection("Variables").GetChildren().ToList();
-bool SqlLoggingEnabled = WebAppConfig.GetValue("SqlLogging:Enabled", false);
-bool AbortScriptOnSqlFailure = WebAppConfig.GetValue("SqlLogging:AbortScriptOnFailure", true);
-string SqlConnectionString = WebAppConfig.GetValue("SqlLogging:ConnectionString", "")!;
-string SqlTable = WebAppConfig.GetValue("SqlLogging:Table", "Log")!;
+var CachedVariables = app.Configuration.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
+var PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren().ToList();
+bool SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
+string UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
+bool AbortScriptOnSqlFailure = app.Configuration.GetValue("SqlLogging:AbortScriptOnFailure", true);
+string SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
+string SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
 
 if (SqlLoggingEnabled) {
     string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
@@ -87,13 +92,15 @@ app.Map("/whoami", async (HttpContext Context) =>
 app.Map("/logoff", async (HttpContext Context) =>
     {
         Context.Response.StatusCode = 401;
-        await Context.Response.WriteAsync("logoff");;
+        await Context.Response.WriteAsync("logoff");
     }
 );
 
 app.Map("/PowerShell/", async (HttpContext Context) =>
     {
-        var WrapperDict = ScriptCache.ToDictionary(x => x.Key, x => x.Value.Keys.ToList());
+        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
+        System.Text.RegularExpressions.Regex regex = new Regex(@"^[a-z0-9]", RegexOptions.IgnoreCase);
+        var WrapperDict = ScriptCache.Where(x => UserIsInRoleAdmin || regex.IsMatch(x.Key)).ToDictionary(x => x.Key, x => x.Value.Keys.ToList());
         string OutputString = ConvertToJson(WrapperDict,1);
         Context.Response.Headers["Content-Type"] = ResponseContentType;
         await Context.Response.WriteAsync(OutputString);
@@ -115,7 +122,7 @@ app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, 
         var Query = Context.Request.Query.ToDictionary(x => x.Key, x => x.Value.ToString());
         var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
 
-        int Depth = WebAppConfig.GetValue("Depth", 4);
+        int Depth = app.Configuration.GetValue("Depth", 4);
         string DepthHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "depth").Select(x => x.Key).FirstOrDefault("");
 
         if (DepthHeader.Length > 0) { if (int.TryParse(Headers[DepthHeader], out int Depth_)) { Depth = Depth_; } }
@@ -178,21 +185,6 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         }
     }
 
-    PSCredential UserCredential = null!;
-    if (Context.User.Identity.AuthenticationType is not null && Context.User.Identity.AuthenticationType.ToString().ToLower() == "basic") {
-        var Encoding = System.Text.Encoding.GetEncoding("utf-8");
-        string Authorization = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization")
-            .Select(x => Regex.Replace(x.Value.ToString(),@"^basic\s*","",RegexOptions.IgnoreCase))
-            .Select(x => Encoding.GetString(Convert.FromBase64String(x)))
-            .FirstOrDefault("");
-        if (Authorization.Length > 0) {
-            string u = Authorization.Split(":")[0];
-            string p = Authorization.Split(":")[1];
-            var s = new System.Security.SecureString();
-            p.ToCharArray().ToList().ForEach(x => s.AppendChar(x));
-            UserCredential = new System.Management.Automation.PSCredential(u,s);
-        }
-    }
 
     if (SqlLoggingEnabled && AbortScriptOnSqlFailure && SqlLogOutput.Count < 1) {
         success = false;
@@ -211,7 +203,7 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         error = $"Script '{Script}' not found on disk, use {Context.Request.Host}/PowerShell/reload for load new scripts or wrappers and {Context.Request.Host}/PowerShell/clear for clear all";
     } else {
         var initialSessionState = System.Management.Automation.Runspaces.InitialSessionState.CreateDefault();
-        string conf_ExecPol = WebAppConfig.GetValue("ExecutionPolicy", "Unrestricted")!;
+        string conf_ExecPol = app.Configuration.GetValue("ExecutionPolicy", "Unrestricted")!;
         var ExecPol = Enum.Parse(typeof(ExecutionPolicy), conf_ExecPol);
         initialSessionState.ExecutionPolicy = (ExecutionPolicy)ExecPol;
         var PSRunspace = System.Management.Automation.Runspaces.RunspaceFactory.CreateRunspace(initialSessionState);
@@ -221,7 +213,27 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
             PSRunspace.SessionStateProxy.SetVariable(_.Key, _.Value);
         }
 
-        PSRunspace.SessionStateProxy.SetVariable("UserCredential", UserCredential);
+        if (UserCredentialVariable.Length > 0) {
+
+            PSCredential UserCredential = null!;
+            
+            if (Context.User.Identity.AuthenticationType is not null && Context.User.Identity.AuthenticationType.ToString().ToLower() == "basic") {
+                var Encoding = System.Text.Encoding.GetEncoding("utf-8");
+                string Authorization = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization")
+                    .Select(x => Regex.Replace(x.Value.ToString(),@"^basic\s*","",RegexOptions.IgnoreCase))
+                    .Select(x => Encoding.GetString(Convert.FromBase64String(x)))
+                    .FirstOrDefault("");
+                if (Authorization.Length > 0) {
+                    string u = Authorization.Split(":")[0];
+                    string p = Authorization.Split(":")[1];
+                    var s = new System.Security.SecureString();
+                    p.ToCharArray().ToList().ForEach(x => s.AppendChar(x));
+                    UserCredential = new System.Management.Automation.PSCredential(u,s);
+                }
+            }
+
+            PSRunspace.SessionStateProxy.SetVariable(UserCredentialVariable, UserCredential);
+        }
 
         PowerShell PwSh = PowerShell.Create();
         PwSh.Runspace = PSRunspace;
@@ -480,7 +492,7 @@ Dictionary<String, List<String>> ScriptLoader() {
 void ClearCache() {
     var DirectoryInfo = new DirectoryInfo(ScriptRoot);
     var Wrappers = DirectoryInfo.GetDirectories().Where(x => File.Exists(Path.Join(ScriptRoot,x.Name,"wrapper.ps1"))).Select(x => x.Name).ToList();
-    Dictionary<String, Dictionary<String, Dictionary<String, object>>> ScriptCache = new();
+    ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
     foreach(string Wrapper_ in Wrappers) {
         List<string> Scripts = SearchFiles(Path.Join(ScriptRoot,Wrapper_,"scripts"),"*.ps1",false);
         ScriptCache[Wrapper_] = new Dictionary<String, Dictionary<String, object>>();

@@ -11,6 +11,7 @@
 	<ItemGroup>
 		<None Update=".scripts\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
 		<None Update="wwwroot\*">  <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
+		<None Update="Pages\*">  <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
 	</ItemGroup>
 	
 	<ItemGroup>
