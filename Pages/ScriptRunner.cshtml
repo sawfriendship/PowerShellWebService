@@ -6,14 +6,11 @@
 }
 @* <h1>@ViewData["Title"]</h1> *@
 
-<h3>UserIsInRoleAdmin: @Model.UserIsInRoleAdmin.ToString()</h3>
-<h3>UserIsInRoleUser: @Model.UserIsInRoleUser.ToString()</h3>
-<h3>IsAuthenticated: @User.Identity.IsAuthenticated.ToString()</h3>
-
 @if (!@User.Identity.IsAuthenticated) {
-    <h3>Is not Authenticated!</h3>
+    <div class="text-center"><h3>Вы не авторизованы</h3></div>
+} else if (!@Model.UserIsInRoleAdmin && !@Model.UserIsInRoleUser) {
+    <div class="text-center"><h3>У вас нет прав на просмотр этой страницы</h3></div>
 } else {
-    <br>
     <div id="Param" class="input-group" style="display:none">
         <select style="max-width:90px" name="Type" class="form-select param_prop">
             <option value="String">String</option>

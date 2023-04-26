@@ -1,27 +1,27 @@
 using System;
 using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Data.Odbc;
+using System.Data.Common;
 using System.Security;
 using System.Security.AccessControl;
 using System.Security.Principal;
-using System.Text;
-using System.Configuration;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Collections.ObjectModel;
+using System.Linq;
+using System.Configuration;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
+using System.Reflection;
 using Microsoft.PowerShell;
 using Microsoft.PowerShell.Commands;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.Json;
-using System.Reflection;
-using System.Linq;
-using System.Data.Odbc;
-using System.Data.Common;
-using System.Text.RegularExpressions;
 
 string ROOT_DIR = AppContext.BaseDirectory;
 
@@ -57,13 +57,7 @@ string SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionSt
 string SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
 
 if (SqlLoggingEnabled) {
-    string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
-    var Connection = new OdbcConnection(SqlConnectionString);
-    var Command = new OdbcCommand(SqlQuery, Connection);
-    System.Data.Odbc.OdbcDataAdapter DataAdapter = new();
-    DataAdapter.SelectCommand = Command;
-    System.Data.DataSet DataSet = new();
-    DataAdapter.Fill(DataSet);
+    SqlTableCreate(SqlTable, SqlConnectionString);
 }
 
 ScriptLoader();
@@ -82,9 +76,9 @@ app.Map("/whoami", async (HttpContext Context) =>
             ["User"] = Context.User,
         };
 
-        var result = ConvertToJson(UserInfo);
+        string OutputString = ConvertToJson(UserInfo);
         Context.Response.Headers["Content-Type"] = ResponseContentType;
-        await Context.Response.WriteAsync(result);
+        await Context.Response.WriteAsync(OutputString);
     }
 );
 
@@ -98,16 +92,53 @@ app.Map("/logoff", async (HttpContext Context) =>
 app.Map("/logout", async (HttpContext Context) =>
     {
         Context.Response.StatusCode = 401;
-        await Context.Response.WriteAsync("logoff");
+        await Context.Response.WriteAsync("logout");
+    }
+);
+
+app.Map("/reload", async (HttpContext Context) =>
+    {
+        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
+        string OutputString = "";
+        if (UserIsInRoleAdmin) {
+            OutputString = "{\"Success\":true,\"Error\":\"\"";
+            ScriptLoader();
+        } else {
+            OutputString = "{\"Success\":false,\"Error\":\"access denied\"";
+        }
+        await Context.Response.WriteAsync(OutputString);
+    }
+);
+
+app.Map("/clear", async (HttpContext Context) =>
+    {
+        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
+        string OutputString = "";
+        if (UserIsInRoleAdmin) {
+            OutputString = "{\"Success\":true,\"Error\":\"\"";
+            ClearCache();
+        } else {
+            OutputString = "{\"Success\":false,\"Error\":\"access denied\"";
+        }
+        await Context.Response.WriteAsync(OutputString);
     }
 );
 
 app.Map("/PowerShell/", async (HttpContext Context) =>
     {
         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
-        System.Text.RegularExpressions.Regex regex = new Regex(@"^[a-z0-9]", RegexOptions.IgnoreCase);
-        var WrapperDict = ScriptCache.Where(x => UserIsInRoleAdmin || regex.IsMatch(x.Key)).ToDictionary(x => x.Key, x => x.Value.Keys.ToList());
-        string OutputString = ConvertToJson(WrapperDict,1);
+        bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
+        string OutputString = "";
+
+        app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL='/PowerShell/', UserName: '{Context.User.Identity.Name}'");
+        if (UserIsInRoleAdmin || UserIsInRoleUser) {
+            System.Text.RegularExpressions.Regex regex = new Regex(@"^[a-z0-9]", RegexOptions.IgnoreCase);
+            var WrapperDict = ScriptCache.Where(x => UserIsInRoleAdmin || regex.IsMatch(x.Key)).ToDictionary(x => x.Key, x => x.Value.Keys.ToList());
+            OutputString = ConvertToJson(WrapperDict,1);
+        } else {
+            OutputString = "{\"Success\":false,\"Error\":\"access denied\"";
+        }
+
         Context.Response.Headers["Content-Type"] = ResponseContentType;
         await Context.Response.WriteAsync(OutputString);
     }
@@ -115,9 +146,20 @@ app.Map("/PowerShell/", async (HttpContext Context) =>
 
 app.Map("/PowerShell/{Wrapper}", async (string Wrapper, HttpContext Context) =>
     {
-        List<string> Scripts = new();
-        if (ScriptCache.ContainsKey(Wrapper)) {Scripts = ScriptCache[Wrapper].Keys.ToList();}
-        string OutputString = ConvertToJson(Scripts,1);
+        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
+        bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
+        string OutputString = "";
+
+        app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL='/PowerShell/{Wrapper}', UserName: '{Context.User.Identity.Name}'");
+        if (UserIsInRoleAdmin || UserIsInRoleUser) {
+            List<string> Scripts = new();
+            if (ScriptCache.ContainsKey(Wrapper)) {
+                Scripts = ScriptCache[Wrapper].Keys.ToList();
+            }
+            OutputString = ConvertToJson(Scripts,1);
+        } else {
+            OutputString = "{\"Success\":false,\"Error\":\"access denied\"";
+        }
         Context.Response.Headers["Content-Type"] = ResponseContentType;
         await Context.Response.WriteAsync(OutputString);
     }
@@ -125,51 +167,52 @@ app.Map("/PowerShell/{Wrapper}", async (string Wrapper, HttpContext Context) =>
 
 app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, HttpContext Context) =>
     {
-        var Query = Context.Request.Query.ToDictionary(x => x.Key, x => x.Value.ToString());
-        var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
+        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
+        bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
+        string OutputString = "";
+        if (UserIsInRoleAdmin || UserIsInRoleUser) {
+            // WrapperPermissions
+            ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
+            string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
+            string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
+            if (!ScriptCache.ContainsKey(Wrapper)) {
+                OutputString = "{\"Success\":false,\"Error\":\"Wrapper '{Wrapper}' not found in cache, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all\"";
+            } else if (!ScriptCache[Wrapper].ContainsKey(Script)) {
+                OutputString = "{\"Success\":false,\"Error\":\"Script '{Script}' not found in cache, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all\"";
+            } else if (!File.Exists(WrapperFile)) {
+                OutputString = "{\"Success\":false,\"Error\":\"Wrapper '{Wrapper}' not found on disk, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all\"";
+            } else if (!File.Exists(ScriptFile)) {
+                OutputString = "{\"Success\":false,\"Error\":\"Script '{Script}' not found on disk, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all\"";
+            } else {
+                var Query = Context.Request.Query.ToDictionary(x => x.Key, x => x.Value.ToString());
+                var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
 
-        int Depth = app.Configuration.GetValue("Depth", 4);
-        string DepthHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "depth").Select(x => x.Key).FirstOrDefault("");
+                int Depth = app.Configuration.GetValue("Depth", 4);
+                string DepthHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "depth").Select(x => x.Key).FirstOrDefault("");
 
-        if (DepthHeader.Length > 0) { if (int.TryParse(Headers[DepthHeader], out int Depth_)) { Depth = Depth_; } }
+                if (DepthHeader.Length > 0) { if (int.TryParse(Headers[DepthHeader], out int Depth_)) { Depth = Depth_; } }
 
-        var streamReader = new StreamReader(Context.Request.Body, encoding: System.Text.Encoding.UTF8);
-        string Body = await streamReader.ReadToEndAsync();
-        string pwsh_result = PSScriptRunner(Wrapper, Script, Query, Body, Depth, Context);
+                app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL='/PowerShell/{Wrapper}/{Script}', UserName: '{Context.User.Identity.Name}'");
+
+                var streamReader = new StreamReader(Context.Request.Body, encoding: System.Text.Encoding.UTF8);
+                string Body = await streamReader.ReadToEndAsync();
+                OutputString = PSScriptRunner(Wrapper, Script, Query, Body, Depth, Context);
+            }
+        } else {
+            OutputString = "{\"Success\":\"false,\"Error\":\"access denied\"";
+        }
         Context.Response.Headers["Content-Type"] = ResponseContentType;
-        await Context.Response.WriteAsync(pwsh_result);
+        await Context.Response.WriteAsync(OutputString);
     }
 );
 
-app.Map("/PowerShell/reload", async (HttpContext Context) =>
-    {
-        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
-        string response = "";
-        if (UserIsInRoleAdmin) {
-            response = "ok";
-            ScriptLoader();
-        } else {
-            response = "access denied";
-        }
-        await Context.Response.WriteAsync(response);
-    }
-);
 
-app.Map("/PowerShell/clear", async (HttpContext Context) =>
-    {
-        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
-        string response = "";
-        if (UserIsInRoleAdmin) {
-            response = "ok";
-            ClearCache();
-        } else {
-            response = "access denied";
-        }
-        await Context.Response.WriteAsync(response);
-    }
-);
 
 string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> Query, string Body, int Depth, HttpContext Context) {
+    ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
+    PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren().ToList();
+    UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
+
     Dictionary<string,object> SqlLogOutput = new();
     Collection<PSObject> PSObjects = new();
     OrderedDictionary ResultTable = new();
@@ -186,7 +229,17 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
     string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
     string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
     
+    SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
+
     if (SqlLoggingEnabled) {
+        AbortScriptOnSqlFailure = app.Configuration.GetValue("SqlLogging:AbortScriptOnFailure", true);
+        SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
+
+        if (SqlTable != app.Configuration.GetValue("SqlLogging:Table", "Log")) {
+            SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log");
+            SqlTableCreate(SqlTable, SqlConnectionString);
+        }
+
         Dictionary<string,object> SqlLogParam = new()
         {
             ["Method"] = Context.Request.Method,
@@ -205,22 +258,9 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         }
     }
 
-
     if (SqlLoggingEnabled && AbortScriptOnSqlFailure && SqlLogOutput.Count < 1) {
         success = false;
         error = $"SQL Failure";
-    } else if (!ScriptCache.ContainsKey(Wrapper)) {
-        success = false;
-        error = $"Wrapper '{Wrapper}' not found in cache, use {Context.Request.Host}/PowerShell/reload for load new scripts or wrappers and {Context.Request.Host}/PowerShell/clear for clear all";
-    } else if (!ScriptCache[Wrapper].ContainsKey(Script)) {
-        success = false;
-        error = $"Script '{Script}' not found in cache, use {Context.Request.Host}/PowerShell/reload for load new scripts or wrappers and {Context.Request.Host}/PowerShell/clear for clear all";
-    } else if (!File.Exists(WrapperFile)) {
-        success = false;
-        error = $"Wrapper '{Wrapper}' not found on disk, use {Context.Request.Host}/PowerShell/reload for load new scripts or wrappers and {Context.Request.Host}/PowerShell/clear for clear all";
-    } else if (!File.Exists(ScriptFile)) {
-        success = false;
-        error = $"Script '{Script}' not found on disk, use {Context.Request.Host}/PowerShell/reload for load new scripts or wrappers and {Context.Request.Host}/PowerShell/clear for clear all";
     } else {
         var initialSessionState = System.Management.Automation.Runspaces.InitialSessionState.CreateDefault();
         string conf_ExecPol = app.Configuration.GetValue("ExecutionPolicy", "Unrestricted")!;
@@ -430,6 +470,16 @@ string ConvertToJson(object data, int maxDepth = 4, bool enumsAsStrings = true, 
     return Result;
 }
 
+void SqlTableCreate(string SqlTable, string ConnectionString) {
+    string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
+    var Connection = new OdbcConnection(SqlConnectionString);
+    var Command = new OdbcCommand(SqlQuery, Connection);
+    System.Data.Odbc.OdbcDataAdapter DataAdapter = new();
+    DataAdapter.SelectCommand = Command;
+    System.Data.DataSet DataSet = new();
+    DataAdapter.Fill(DataSet);
+}
+
 Dictionary<string,object> SqlHelper(string SqlTable, Dictionary<string,object> Params, string Operation, string ConnectionString, string PrimaryKey = "id") {
     Dictionary<string,object> result = new();
     List<string> Keys = Params.Select(x => x.Key).Where(x => x != PrimaryKey).ToList();
@@ -492,6 +542,10 @@ List<String> SearchFiles(string Path, string Extension, bool RaiseError) {
 }
 
 Dictionary<String, List<String>> ScriptLoader() {
+    ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
+    ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
+    CachedVariables = app.Configuration.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
+
     var DirectoryInfo = new DirectoryInfo(ScriptRoot);
     var Wrappers = DirectoryInfo.GetDirectories().Where(x => File.Exists(Path.Join(ScriptRoot,x.Name,"wrapper.ps1"))).Select(x => x.Name).ToList();
     Dictionary<String, List<String>> results = new();
@@ -511,6 +565,11 @@ Dictionary<String, List<String>> ScriptLoader() {
 }
  
 void ClearCache() {
+
+    ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
+    ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
+    CachedVariables = app.Configuration.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
+
     var DirectoryInfo = new DirectoryInfo(ScriptRoot);
     var Wrappers = DirectoryInfo.GetDirectories().Where(x => File.Exists(Path.Join(ScriptRoot,x.Name,"wrapper.ps1"))).Select(x => x.Name).ToList();
     ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();

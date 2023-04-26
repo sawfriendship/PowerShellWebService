@@ -121,7 +121,6 @@ function del_param() {
 }
 
 function update_url() {
-    // var url = `/PowerShell/${wrapper}/${script}`
     var url = '/PowerShell'
     var wrapper = $('#_wrapper').val()
     if (wrapper) {url = `${url}/${wrapper}`}
@@ -192,8 +191,8 @@ function write_to_clip() {
     navigator.clipboard.writeText($('#_result').val())
 }
 
-function cache_reload() {$.ajax({url:'/PowerShell/reload',success:function(responce){load_wrapper_form();}})}
-function cache_clear() {$.ajax({url:'/PowerShell/clear',success:function(responce){load_wrapper_form();}})}
+function cache_reload() {$.ajax({url:'/reload',success:function(responce){load_wrapper_form();}})}
+function cache_clear() {$.ajax({url:'/clear',success:function(responce){load_wrapper_form();}})}
 
 $( document ).ready(function() {
     load_wrapper_form();
