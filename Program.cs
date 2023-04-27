@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using System.Data.Odbc;
 using System.Data.Common;
 using System.Security;
@@ -56,6 +57,8 @@ bool AbortScriptOnSqlFailure = app.Configuration.GetValue("SqlLogging:AbortScrip
 string SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
 string SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
 
+var jOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = false };
+
 if (SqlLoggingEnabled) {
     SqlTableCreate(SqlTable, SqlConnectionString);
 }
@@ -64,6 +67,7 @@ ScriptLoader();
 
 app.Map("/whoami", async (HttpContext Context) =>
     {
+        Context.Response.Headers["Content-Type"] = ResponseContentType;
         var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
         string AuthorizationHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization").Select(x => x.Key).FirstOrDefault("");
         if (Headers.ContainsKey(AuthorizationHeader)) { Headers[AuthorizationHeader] = "***"; }
@@ -77,7 +81,6 @@ app.Map("/whoami", async (HttpContext Context) =>
         };
 
         string OutputString = ConvertToJson(UserInfo);
-        Context.Response.Headers["Content-Type"] = ResponseContentType;
         await Context.Response.WriteAsync(OutputString);
     }
 );
@@ -99,28 +102,26 @@ app.Map("/logout", async (HttpContext Context) =>
 app.Map("/reload", async (HttpContext Context) =>
     {
         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
-        string OutputString = "";
-        if (UserIsInRoleAdmin) {
-            OutputString = "{\"Success\":true,\"Error\":\"\"";
-            ScriptLoader();
+
+        if (!UserIsInRoleAdmin) {
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
         } else {
-            OutputString = "{\"Success\":false,\"Error\":\"access denied\"";
+            ScriptLoader();
+            await Context.Response.WriteAsJsonAsync(new { Success = true, Error = "" }, jOptions);
         }
-        await Context.Response.WriteAsync(OutputString);
     }
 );
 
 app.Map("/clear", async (HttpContext Context) =>
     {
         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
-        string OutputString = "";
-        if (UserIsInRoleAdmin) {
-            OutputString = "{\"Success\":true,\"Error\":\"\"";
-            ClearCache();
+
+        if (!UserIsInRoleAdmin) {
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
         } else {
-            OutputString = "{\"Success\":false,\"Error\":\"access denied\"";
+            ClearCache();
+            await Context.Response.WriteAsJsonAsync(new { Success = true, Error = "" }, jOptions);
         }
-        await Context.Response.WriteAsync(OutputString);
     }
 );
 
@@ -128,19 +129,14 @@ app.Map("/PowerShell/", async (HttpContext Context) =>
     {
         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
         bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
-        string OutputString = "";
-
         app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL='/PowerShell/', UserName: '{Context.User.Identity.Name}'");
-        if (UserIsInRoleAdmin || UserIsInRoleUser) {
-            System.Text.RegularExpressions.Regex regex = new Regex(@"^[a-z0-9]", RegexOptions.IgnoreCase);
-            var WrapperDict = ScriptCache.Where(x => UserIsInRoleAdmin || regex.IsMatch(x.Key)).ToDictionary(x => x.Key, x => x.Value.Keys.ToList());
-            OutputString = ConvertToJson(WrapperDict,1);
-        } else {
-            OutputString = "{\"Success\":false,\"Error\":\"access denied\"";
-        }
 
-        Context.Response.Headers["Content-Type"] = ResponseContentType;
-        await Context.Response.WriteAsync(OutputString);
+        System.Text.RegularExpressions.Regex regex = new Regex(@"^[a-z0-9]", RegexOptions.IgnoreCase);
+        if (!(UserIsInRoleAdmin || UserIsInRoleUser)) {
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
+        } else {
+            await Context.Response.WriteAsJsonAsync(ScriptCache.Where(x => UserIsInRoleAdmin || regex.IsMatch(x.Key)).ToDictionary(x => x.Key, x => x.Value.Keys.ToList()), jOptions);
+        }
     }
 );
 
@@ -148,41 +144,39 @@ app.Map("/PowerShell/{Wrapper}", async (string Wrapper, HttpContext Context) =>
     {
         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
         bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
-        string OutputString = "";
-
         app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL='/PowerShell/{Wrapper}', UserName: '{Context.User.Identity.Name}'");
-        if (UserIsInRoleAdmin || UserIsInRoleUser) {
-            List<string> Scripts = new();
-            if (ScriptCache.ContainsKey(Wrapper)) {
-                Scripts = ScriptCache[Wrapper].Keys.ToList();
-            }
-            OutputString = ConvertToJson(Scripts,1);
+
+        if (!(UserIsInRoleAdmin || UserIsInRoleUser)) {
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
         } else {
-            OutputString = "{\"Success\":false,\"Error\":\"access denied\"";
+            List<string> Scripts = new();
+            if (ScriptCache.ContainsKey(Wrapper)) {Scripts = ScriptCache[Wrapper].Keys.ToList();}
+            await Context.Response.WriteAsJsonAsync(Scripts, jOptions);
         }
-        Context.Response.Headers["Content-Type"] = ResponseContentType;
-        await Context.Response.WriteAsync(OutputString);
     }
 );
 
 app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, HttpContext Context) =>
     {
+        Context.Response.Headers["Content-Type"] = ResponseContentType;
         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
         bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
-        string OutputString = "";
-        if (UserIsInRoleAdmin || UserIsInRoleUser) {
+
+        if (!(UserIsInRoleAdmin || UserIsInRoleUser)) {
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
+        } else {
             // WrapperPermissions
             ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
             string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
             string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
             if (!ScriptCache.ContainsKey(Wrapper)) {
-                OutputString = "{\"Success\":false,\"Error\":\"Wrapper '{Wrapper}' not found in cache, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all\"";
+                await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Wrapper '{Wrapper}' not found in cache, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all" }, jOptions);
             } else if (!ScriptCache[Wrapper].ContainsKey(Script)) {
-                OutputString = "{\"Success\":false,\"Error\":\"Script '{Script}' not found in cache, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all\"";
+                await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Script '{Script}' not found in cache, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all" }, jOptions);
             } else if (!File.Exists(WrapperFile)) {
-                OutputString = "{\"Success\":false,\"Error\":\"Wrapper '{Wrapper}' not found on disk, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all\"";
+                await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Wrapper '{Wrapper}' not found on disk, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all" }, jOptions);
             } else if (!File.Exists(ScriptFile)) {
-                OutputString = "{\"Success\":false,\"Error\":\"Script '{Script}' not found on disk, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all\"";
+                await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Script '{Script}' not found on disk, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all" }, jOptions);
             } else {
                 var Query = Context.Request.Query.ToDictionary(x => x.Key, x => x.Value.ToString());
                 var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
@@ -196,17 +190,14 @@ app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, 
 
                 var streamReader = new StreamReader(Context.Request.Body, encoding: System.Text.Encoding.UTF8);
                 string Body = await streamReader.ReadToEndAsync();
-                OutputString = PSScriptRunner(Wrapper, Script, Query, Body, Depth, Context);
+                string OutputString = PSScriptRunner(Wrapper, Script, Query, Body, Depth, Context);
+                await Context.Response.WriteAsync(OutputString);
             }
-        } else {
-            OutputString = "{\"Success\":\"false,\"Error\":\"access denied\"";
+            
         }
-        Context.Response.Headers["Content-Type"] = ResponseContentType;
-        await Context.Response.WriteAsync(OutputString);
+
     }
 );
-
-
 
 string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> Query, string Body, int Depth, HttpContext Context) {
     ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
@@ -543,7 +534,6 @@ List<String> SearchFiles(string Path, string Extension, bool RaiseError) {
 
 Dictionary<String, List<String>> ScriptLoader() {
     ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
-    ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
     CachedVariables = app.Configuration.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
 
     var DirectoryInfo = new DirectoryInfo(ScriptRoot);
