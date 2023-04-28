@@ -14,22 +14,25 @@ function load_wrapper_form() {
         cache: true,
         contentType: 'application/json; charset=utf-8',
         success: function(responce){
-            for (var k in responce) {$(`<option value="${k}">${k}</option>`).appendTo('#_wrapper')}
-            if (has_key(localStorage,'wrapper')) {
-                var wrapper = localStorage['wrapper']
-                if (wrapper) {
-                    $('#_wrapper').val(wrapper)
-                    $('#_script').prop('disabled', false)
-                }
+			if (responce.Success) {
+				var data = responce.Data
+				for (var k in data) {$(`<option value="${k}">${k}</option>`).appendTo('#_wrapper')}
+				if (has_key(localStorage,'wrapper')) {
+					var wrapper = localStorage['wrapper']
+					if (wrapper) {
+						$('#_wrapper').val(wrapper)
+						$('#_script').prop('disabled', false)
+					}
 
-                load_script_form(wrapper);
+					load_script_form(wrapper);
 
-                if (has_key(localStorage,'script')) {
-                    var script = localStorage['script']
-                    $('#_script').val(script)
-                }
-                
-            }
+					if (has_key(localStorage,'script')) {
+						var script = localStorage['script']
+						$('#_script').val(script)
+					}
+					
+				}
+			}
         },
         error: function(responce){
             $('#_script').prop('disabled', true)
@@ -47,14 +50,17 @@ function load_script_form(wrapper) {
             cache: true,
             contentType: 'application/json; charset=utf-8',
             success: function(responce){
-                for (var k in responce) {$(`<option value="${responce[k]}">${responce[k]}</option>`).appendTo('#_script')}
-                if (has_key(localStorage,'script')) {
-                    var script = localStorage['script']
-                    $('#_script').val(script)
-                }
+				if (responce.Success) {
+					var data = responce.Data
+					for (var k in data) {$(`<option value="${data[k]}">${data[k]}</option>`).appendTo('#_script')}
+					if (has_key(localStorage,'script')) {
+						var script = localStorage['script']
+						$('#_script').val(script)
+					}
 
-                $('#_script').prop('disabled', false)
-                update_url();
+					$('#_script').prop('disabled', false)
+					update_url();
+				}
             },
             error: function(responce){
                 $('#_script').prop('disabled', true)
@@ -145,7 +151,7 @@ function send_body() {
     var request = {
         url: url,
         method: method,
-        headers: {Depth:depth},
+        headers: {maxDepth:depth},
         success: function(responce){
             $('._btn_send').removeClass('disabled')
             $('#_result').removeClass('processing')

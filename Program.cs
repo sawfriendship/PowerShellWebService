@@ -36,12 +36,13 @@ WebAppBuilder.Configuration
 
 await using var app = WebAppBuilder.Build();
 
-string ResponseContentType = "application/json; charset=utf-8";
 string DateTimeLogFormat = app.Configuration.GetValue("DateTimeLogFormat", "yyyy-MM-dd HH:mm:ss")!;
 
-app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, StartUp");
+Console.WriteLine($"{DateTime.Now.ToString(DateTimeLogFormat)}, StartUp");
 
-if (System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development") { app.UseExceptionHandler("/Error"); }
+string RESPONSE_CONTENT_TYPE = "application/json; charset=utf-8";
+string ASPNETCORE_ENVIRONMENT = System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")!;
+if (ASPNETCORE_ENVIRONMENT == "Development") { app.UseExceptionHandler("/Error"); }
 
 app.UseStaticFiles();
 app.UseRouting();
@@ -65,9 +66,22 @@ if (SqlLoggingEnabled) {
 
 ScriptLoader();
 
+app.Map("/check", async (HttpContext Context) =>
+    {
+        bool test = true;
+        try {
+            app.Configuration.GetSection("ExecutionPolicy");
+        } catch {
+            test = false;
+        }
+
+        await Context.Response.WriteAsJsonAsync(new { Success = test }, jOptions);
+    }
+);
+
 app.Map("/whoami", async (HttpContext Context) =>
     {
-        Context.Response.Headers["Content-Type"] = ResponseContentType;
+        Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
         var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
         string AuthorizationHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization").Select(x => x.Key).FirstOrDefault("");
         if (Headers.ContainsKey(AuthorizationHeader)) { Headers[AuthorizationHeader] = "***"; }
@@ -101,7 +115,7 @@ app.Map("/logout", async (HttpContext Context) =>
 
 app.Map("/reload", async (HttpContext Context) =>
     {
-        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
+        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
 
         if (!UserIsInRoleAdmin) {
             await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
@@ -114,7 +128,7 @@ app.Map("/reload", async (HttpContext Context) =>
 
 app.Map("/clear", async (HttpContext Context) =>
     {
-        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
+        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
 
         if (!UserIsInRoleAdmin) {
             await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
@@ -127,45 +141,51 @@ app.Map("/clear", async (HttpContext Context) =>
 
 app.Map("/PowerShell/", async (HttpContext Context) =>
     {
-        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
-        bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
-        app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL='/PowerShell/', UserName: '{Context.User.Identity.Name}'");
+        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
+        bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
+
+        Console.WriteLine($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL: '/PowerShell/', UserName: '{Context.User.Identity.Name}'");
 
         System.Text.RegularExpressions.Regex regex = new Regex(@"^[a-z0-9]", RegexOptions.IgnoreCase);
+
         if (!(UserIsInRoleAdmin || UserIsInRoleUser)) {
             await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
         } else {
-            await Context.Response.WriteAsJsonAsync(ScriptCache.Where(x => UserIsInRoleAdmin || regex.IsMatch(x.Key)).ToDictionary(x => x.Key, x => x.Value.Keys.ToList()), jOptions);
+            Dictionary<string,List<string>> Wrappers = ScriptCache.Where(x => UserIsInRoleAdmin || regex.IsMatch(x.Key)).ToDictionary(x => x.Key, x => x.Value.Keys.ToList());
+            await Context.Response.WriteAsJsonAsync(new { Success = true, Data = Wrappers}, jOptions);
         }
     }
 );
 
 app.Map("/PowerShell/{Wrapper}", async (string Wrapper, HttpContext Context) =>
     {
-        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
-        bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
-        app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL='/PowerShell/{Wrapper}', UserName: '{Context.User.Identity.Name}'");
+        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
+        bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
+
+        Console.WriteLine($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL: '/PowerShell/{Wrapper}', UserName: '{Context.User.Identity.Name}'");
 
         if (!(UserIsInRoleAdmin || UserIsInRoleUser)) {
             await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
         } else {
             List<string> Scripts = new();
             if (ScriptCache.ContainsKey(Wrapper)) {Scripts = ScriptCache[Wrapper].Keys.ToList();}
-            await Context.Response.WriteAsJsonAsync(Scripts, jOptions);
+            await Context.Response.WriteAsJsonAsync(new { Success = true, Data = Scripts }, jOptions);
         }
     }
 );
 
 app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, HttpContext Context) =>
     {
-        Context.Response.Headers["Content-Type"] = ResponseContentType;
-        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
-        bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => Context.User.IsInRole(x));
+        Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
+        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
+        bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
+        bool WrapperPermission = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
 
         if (!(UserIsInRoleAdmin || UserIsInRoleUser)) {
-            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied: user" }, jOptions);
+        } else if (!WrapperPermission) {
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied: wrapper" }, jOptions);
         } else {
-            // WrapperPermissions
             ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
             string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
             string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
@@ -179,30 +199,37 @@ app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, 
                 await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Script '{Script}' not found on disk, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all" }, jOptions);
             } else {
                 var Query = Context.Request.Query.ToDictionary(x => x.Key, x => x.Value.ToString());
-                var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
+                
 
-                int Depth = app.Configuration.GetValue("Depth", 4);
-                string DepthHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "depth").Select(x => x.Key).FirstOrDefault("");
-
-                if (DepthHeader.Length > 0) { if (int.TryParse(Headers[DepthHeader], out int Depth_)) { Depth = Depth_; } }
-
-                app.Logger.LogInformation($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL='/PowerShell/{Wrapper}/{Script}', UserName: '{Context.User.Identity.Name}'");
+                Console.WriteLine($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL: '/PowerShell/{Wrapper}/{Script}', UserName: '{Context.User.Identity.Name}'");
 
                 var streamReader = new StreamReader(Context.Request.Body, encoding: System.Text.Encoding.UTF8);
                 string Body = await streamReader.ReadToEndAsync();
-                string OutputString = PSScriptRunner(Wrapper, Script, Query, Body, Depth, Context);
+                string OutputString = PSScriptRunner(Wrapper, Script, Query, Body, Context);
                 await Context.Response.WriteAsync(OutputString);
             }
-            
         }
-
     }
 );
 
-string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> Query, string Body, int Depth, HttpContext Context) {
+string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> Query, string Body, HttpContext Context) {
     ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
     PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren().ToList();
     UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
+
+    var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
+
+    int maxDepth = app.Configuration.GetValue("JsonSerialization:maxDepth", 4);
+    bool enumsAsStrings = app.Configuration.GetValue("JsonSerialization:enumsAsStrings", true);
+    bool compressOutput = app.Configuration.GetValue("JsonSerialization:compressOutput", false);
+
+    string h_depth = Context.Request.Headers.Where(x => x.Key.ToLower() == "depth" || x.Key.ToLower() == "maxdepth").Select(x => x.Key).FirstOrDefault("");
+    string h_enums = Context.Request.Headers.Where(x => x.Key.ToLower() == "enums" || x.Key.ToLower() == "enumsAsStrings").Select(x => x.Key).FirstOrDefault("");
+    string h_compress = Context.Request.Headers.Where(x => x.Key.ToLower() == "compress" || x.Key.ToLower() == "compressOutput").Select(x => x.Key).FirstOrDefault("");
+
+    if (h_depth.Length > 0) { if (int.TryParse(Headers[h_depth], out int h_depth_)) { maxDepth = h_depth_; }}
+    if (h_enums.Length > 0) { if (int.TryParse(Headers[h_enums], out int h_enums_)) { enumsAsStrings = Convert.ToBoolean(h_enums_); }}
+    if (h_compress.Length > 0) { if (int.TryParse(Headers[h_compress], out int h_compress_)) { compressOutput = Convert.ToBoolean(h_compress_); }}
 
     Dictionary<string,object> SqlLogOutput = new();
     Collection<PSObject> PSObjects = new();
@@ -219,7 +246,6 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
     string PSOutputString = "";
     string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
     string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
-    
     SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
 
     if (SqlLoggingEnabled) {
@@ -227,8 +253,9 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
 
         if (SqlTable != app.Configuration.GetValue("SqlLogging:Table", "Log")) {
-            SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log");
+            SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
             SqlTableCreate(SqlTable, SqlConnectionString);
+            Console.WriteLine($"{DateTime.Now.ToString(DateTimeLogFormat)}, SQL TABLE CHANGED!");
         }
 
         Dictionary<string,object> SqlLogParam = new()
@@ -406,7 +433,7 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         ResultTable["Error"] = error;
         ResultTable["Streams"] = Streams;
         ResultTable["InvocationStateInfo"] = StateInfo;
-        PSOutputString = ConvertToJson(ResultTable,Depth,RaiseError:true);
+        PSOutputString = ConvertToJson(ResultTable,maxDepth:maxDepth,enumsAsStrings:enumsAsStrings,compressOutput:compressOutput,RaiseError:true);
     } catch (Exception e) {
         Streams.Clear();
         success = false;
@@ -414,15 +441,15 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         ResultTable["Error"] = $"JSON serialization error: {e}";
         ResultTable["Streams"] = Streams;
         ResultTable["InvocationStateInfo"] = StateInfo;
-        PSOutputString = ConvertToJson(ResultTable,Depth,RaiseError:false);
+        PSOutputString = ConvertToJson(ResultTable,maxDepth:maxDepth,enumsAsStrings:enumsAsStrings,compressOutput:compressOutput,RaiseError:false);
     }
 
     if (SqlLoggingEnabled && SqlLogOutput.Count > 0) {
-        string PSObjectsJson = ConvertToJson(PSObjects,4,true,true,false);
-        string ErrorListJson = ConvertToJson(ErrorList,3,true,true,false);
-        string WarningListJson = ConvertToJson(WarningList,3,true,true,false);
-        string InformationListJson = ConvertToJson(InformationList,3,true,true,false);
-        string VerboseListJson = ConvertToJson(VerboseList,3,true,true,false);
+        string PSObjectsJson = ConvertToJson(PSObjects,maxDepth:4,enumsAsStrings:true,compressOutput:true,RaiseError:false);
+        string ErrorListJson = ConvertToJson(ErrorList,maxDepth:3,enumsAsStrings:true,compressOutput:true,RaiseError:false);
+        string WarningListJson = ConvertToJson(WarningList,maxDepth:3,enumsAsStrings:true,compressOutput:true,RaiseError:false);
+        string InformationListJson = ConvertToJson(InformationList,maxDepth:3,enumsAsStrings:true,compressOutput:true,RaiseError:false);
+        string VerboseListJson = ConvertToJson(VerboseList,maxDepth:3,enumsAsStrings:true,compressOutput:true,RaiseError:false);
 
         Dictionary<string,object> SqlLogParam = new()
         {
@@ -485,7 +512,7 @@ Dictionary<string,object> SqlHelper(string SqlTable, Dictionary<string,object> P
             Query = $"UPDATE [{SqlTable.Trim('[',']')}] SET {String.Join(',',Keys.Select(x => $"[{x}]=?"))} OUTPUT INSERTED.* WHERE [{PrimaryKey.Trim('[',']')}] = ?";
             break;
     }
-    Console.WriteLine(Query);
+
     var Connection = new OdbcConnection(ConnectionString);
     var Command = new OdbcCommand(Query, Connection);
     foreach (string Key in Keys) {
@@ -576,3 +603,4 @@ void ClearCache() {
 }
 
 await app.RunAsync();
+
