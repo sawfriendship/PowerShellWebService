@@ -19,6 +19,7 @@ using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
 using System.Reflection;
+using System.Diagnostics;
 using Microsoft.PowerShell;
 using Microsoft.PowerShell.Commands;
 using System.Management.Automation;
@@ -91,6 +92,7 @@ app.Map("/whoami", async (HttpContext Context) =>
             ["Host"] = Context.Request.Host,
             ["Headers"] = Headers,
             ["Connection"] = Context.Connection,
+            ["pid"] = Process.GetCurrentProcess().Id,
             ["User"] = Context.User,
         };
 
@@ -231,11 +233,12 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
     if (h_enums.Length > 0) { if (int.TryParse(Headers[h_enums], out int h_enums_)) { enumsAsStrings = Convert.ToBoolean(h_enums_); }}
     if (h_compress.Length > 0) { if (int.TryParse(Headers[h_compress], out int h_compress_)) { compressOutput = Convert.ToBoolean(h_compress_); }}
 
+    var CurrentProcess = Process.GetCurrentProcess();
     Dictionary<string,object> SqlLogOutput = new();
-    Collection<PSObject> PSObjects = new();
     OrderedDictionary ResultTable = new();
+    Collection<PSObject> PSObjects = new();
     OrderedDictionary Streams = new();
-    OrderedDictionary StateInfo = new();
+    OrderedDictionary StateInfo = new() {["pid"] = CurrentProcess.Id};
     List<Object> ErrorList = new();
     List<Object> WarningList = new();
     List<Object> VerboseList = new();
@@ -260,6 +263,7 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
 
         Dictionary<string,object> SqlLogParam = new()
         {
+            ["PID"] = Process.GetCurrentProcess().Id,
             ["Method"] = Context.Request.Method,
             ["Wrapper"] = Wrapper,
             ["Script"] = Script,
@@ -489,7 +493,7 @@ string ConvertToJson(object data, int maxDepth = 4, bool enumsAsStrings = true, 
 }
 
 void SqlTableCreate(string SqlTable, string ConnectionString) {
-    string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
+    string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [PID] int NULL, [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
     var Connection = new OdbcConnection(SqlConnectionString);
     var Command = new OdbcCommand(SqlQuery, Connection);
     System.Data.Odbc.OdbcDataAdapter DataAdapter = new();
