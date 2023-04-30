@@ -74,14 +74,14 @@ app.Map("/check", async (HttpContext Context) =>
         Dictionary<string,object> Output = new();
         List<string> SettingFiles = new() {
             "appsettings.json",
-            $"appsettings.{ASPNETCORE_ENVIRONMENT}.json",
+            "appsettings.Development.json",
         };
 
         foreach (string SettingFile_ in SettingFiles) {
             bool success = true;
             string ErrorMessage = "";
             try {
-                string FileContent = System.IO.File.ReadAllText(SettingFile_);
+                string FileContent = File.ReadAllText(SettingFile_);
                 var obj = JsonObject.ConvertFromJson(FileContent, out ErrorRecord error);
             } catch (Exception e) {
                 ErrorMessage = e.Message;
