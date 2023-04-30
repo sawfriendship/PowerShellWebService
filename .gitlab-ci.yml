@@ -11,14 +11,13 @@ deploy_to_repository:
    - New-Object -TypeName PSCustomObject -Property $PSVersionTable | ft PSVersion,PSEdition,OS
    - (Get-Date).ToString('o')
    - $Location = Get-Location
-   - dotnet.exe publish -c Release -r win-x64 -p:PublishReadyToRun=true --no-self-contained
+   - dotnet.exe build
    - Import-Module IISAdministration -WarningAction:SilentlyContinue
    - Get-IISSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
    - Write-Host $Location -ForegroundColor Yellow
    - Get-ChildItem -Path $Location -Recurse | % {$_.FullName.replace($Location,'')}
    - Stop-IISSite -Name 'PowerShellWebService' -Confirm:$false -Passthru | ft Id,Name,State,Bindings
-   - try {Copy-Item -Force -Recurse -Path "$Location\bin\Release\net7.0-windows\win-x64\*" -Destination 'C:\inetpub\PowerShellWebService\'} catch {Write-Warning $_.Exception}
-   - try {Copy-Item -Force -Recurse -Path "$Location\bin\Release\net7.0-windows\win-x64\publish\*" -Destination 'C:\inetpub\PowerShellWebService\'} catch {Write-Warning $_.Exception}
+   - try {Copy-Item -Force -Recurse -Path "$Location\bin\Debug\net7.0-windows\*" -Destination 'C:\inetpub\PowerShellWebService\'} catch {Write-Warning $_.Exception}
    - Start-IISSite -Name 'PowerShellWebService' -Passthru | ft Id,Name,State,Bindings
    - (Get-Date).ToString('o')
   tags: 

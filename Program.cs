@@ -26,13 +26,15 @@ using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 
 string ROOT_DIR = AppContext.BaseDirectory;
+string ASPNETCORE_ENVIRONMENT = System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")!;
+string RESPONSE_CONTENT_TYPE = "application/json; charset=utf-8";
 
 var WebAppBuilder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
 WebAppBuilder.Logging.AddJsonConsole();
 WebAppBuilder.Services.AddRazorPages();
 WebAppBuilder.Configuration
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-    .AddJsonFile($"appsettings.{System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")}.json", optional: true, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{ASPNETCORE_ENVIRONMENT}.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
 await using var app = WebAppBuilder.Build();
@@ -41,8 +43,6 @@ string DateTimeLogFormat = app.Configuration.GetValue("DateTimeLogFormat", "yyyy
 
 Console.WriteLine($"{DateTime.Now.ToString(DateTimeLogFormat)}, StartUp");
 
-string RESPONSE_CONTENT_TYPE = "application/json; charset=utf-8";
-string ASPNETCORE_ENVIRONMENT = System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")!;
 if (ASPNETCORE_ENVIRONMENT == "Development") { app.UseExceptionHandler("/Error"); }
 
 app.UseStaticFiles();
@@ -69,14 +69,32 @@ ScriptLoader();
 
 app.Map("/check", async (HttpContext Context) =>
     {
-        bool test = true;
-        try {
-            app.Configuration.GetSection("ExecutionPolicy");
-        } catch {
-            test = false;
+        JsonObject.ConvertToJsonContext jsonContext = new JsonObject.ConvertToJsonContext(maxDepth: 5, enumsAsStrings: false, compressOutput: false);
+        
+        Dictionary<string,object> Output = new();
+        List<string> SettingFiles = new() {
+            "appsettings.json",
+            $"appsettings.{ASPNETCORE_ENVIRONMENT}.json",
+        };
+
+        foreach (string SettingFile_ in SettingFiles) {
+            bool success = true;
+            string ErrorMessage = "";
+            try {
+                string FileContent = System.IO.File.ReadAllText(SettingFile_);
+                var obj = JsonObject.ConvertFromJson(FileContent, out ErrorRecord error);
+            } catch (Exception e) {
+                ErrorMessage = e.Message;
+                success = false;
+            }
+
+            Output[SettingFile_] =  new Dictionary<string,object> () {
+                ["Success"] = success,
+                ["Error"] = ErrorMessage,
+            };
         }
 
-        await Context.Response.WriteAsJsonAsync(new { Success = test }, jOptions);
+        await Context.Response.WriteAsJsonAsync(Output, jOptions);
     }
 );
 
