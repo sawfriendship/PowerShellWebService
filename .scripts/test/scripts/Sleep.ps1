@@ -1,2 +1,0 @@
-Start-Sleep @Params
-$Params

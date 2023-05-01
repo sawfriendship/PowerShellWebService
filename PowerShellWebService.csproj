@@ -9,9 +9,9 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<None Update=".scripts\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
-		<None Update="wwwroot\*">  <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
-		<None Update="sni.dll">  <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
+		<None Update=".scripts\*" CopyToOutputDirectory="Always"/>
+		<None Update="wwwroot\*" CopyToOutputDirectory="Always"/>
+		<None Update="sni.dll" CopyToOutputDirectory="Always"/>
 	</ItemGroup>
 	
 	<ItemGroup>
