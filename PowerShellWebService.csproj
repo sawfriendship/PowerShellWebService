@@ -11,12 +11,12 @@
 	<ItemGroup>
 		<None Update=".scripts\*"> <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
 		<None Update="wwwroot\*">  <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
-		<None Update="Pages\*">  <CopyToOutputDirectory>Always</CopyToOutputDirectory> </None>
 	</ItemGroup>
 	
 	<ItemGroup>
 
 		<!-- Minimal
+		<Reference Include="sni"><HintPath>C:\Program Files\PowerShell\7\sni.dll</HintPath></Reference>
 		<Reference Include="Microsoft.PowerShell.Commands.Diagnostics"> <HintPath>C:\Program Files\PowerShell\7\Microsoft.PowerShell.Commands.Diagnostics.dll</HintPath> </Reference>
 		<Reference Include="Microsoft.PowerShell.Commands.Management"> <HintPath>C:\Program Files\PowerShell\7\Microsoft.PowerShell.Commands.Management.dll</HintPath> </Reference>
 		<Reference Include="Microsoft.PowerShell.Commands.Utility"> <HintPath>C:\Program Files\PowerShell\7\Microsoft.PowerShell.Commands.Utility.dll</HintPath> </Reference>
@@ -51,6 +51,7 @@
 		<Reference Include="Newtonsoft.Json"><HintPath>C:\Program Files\PowerShell\7\Newtonsoft.Json.dll</HintPath></Reference>
 		<Reference Include="NJsonSchema"><HintPath>C:\Program Files\PowerShell\7\NJsonSchema.dll</HintPath></Reference>
 		<Reference Include="pwsh"><HintPath>C:\Program Files\PowerShell\7\pwsh.dll</HintPath></Reference>
+		<Reference Include="sni"><HintPath>C:\Program Files\PowerShell\7\sni.dll</HintPath></Reference>
 		<Reference Include="System.AppContext"><HintPath>C:\Program Files\PowerShell\7\System.AppContext.dll</HintPath></Reference>
 		<Reference Include="System.Buffers"><HintPath>C:\Program Files\PowerShell\7\System.Buffers.dll</HintPath></Reference>
 		<Reference Include="System.CodeDom"><HintPath>C:\Program Files\PowerShell\7\System.CodeDom.dll</HintPath></Reference>
