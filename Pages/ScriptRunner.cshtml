@@ -6,11 +6,19 @@
 }
 @* <h1>@ViewData["Title"]</h1> *@
 
-@if (!@User.Identity.IsAuthenticated) {
+<div id="conf" style="display:none;">
+    <input name="PwShUrl" value="@Model.PwShUrl">
+</div>
+
+@if (!@Model.IsAuthenticated && !@Model.IsDevelopment) {
     <div class="text-center"><h3>Вы не авторизованы</h3></div>
-} else if (!@Model.UserIsInRoleAdmin && !@Model.UserIsInRoleUser) {
+} else if (!(@Model.UserIsInRoleAdmin || @Model.UserIsInRoleUser) && !@Model.IsDevelopment) {
     <div class="text-center"><h3>У вас нет прав на просмотр этой страницы</h3></div>
 } else {
+    if (@Model.IsDevelopment) {
+        <h3 style="color:red;">Включен режим разработки, права пользователей не учитываются!</h3>
+    }
+
     <div id="Param" class="input-group" style="display:none">
         <select style="max-width:90px" name="Type" class="form-select param_prop">
             <option value="String">String</option>
@@ -91,3 +99,5 @@
         </div>
     </div>
 }
+
+<script src="~/js/ScriptRunner.js" asp-append-version="true"></script>

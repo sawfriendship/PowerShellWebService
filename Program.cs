@@ -25,32 +25,35 @@ using Microsoft.PowerShell.Commands;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 
-string ROOT_DIR = AppContext.BaseDirectory;
-string ASPNETCORE_ENVIRONMENT = System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")!;
-string RESPONSE_CONTENT_TYPE = "application/json; charset=utf-8";
-
 var WebAppBuilder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
 WebAppBuilder.Logging.AddJsonConsole();
 WebAppBuilder.Services.AddRazorPages();
-WebAppBuilder.Configuration
-    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-    .AddJsonFile($"appsettings.{ASPNETCORE_ENVIRONMENT}.json", optional: true, reloadOnChange: true)
-    .AddEnvironmentVariables();
+WebAppBuilder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
 await using var app = WebAppBuilder.Build();
 
+string ROOT_DIR = AppContext.BaseDirectory;
+bool IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
+
+string RESPONSE_CONTENT_TYPE = "application/json; charset=utf-8";
 string DateTimeLogFormat = app.Configuration.GetValue("DateTimeLogFormat", "yyyy-MM-dd HH:mm:ss")!;
+Console.WriteLine($"StartUp:'{DateTime.Now.ToString(DateTimeLogFormat)}', IsDevelopment:'{IsDevelopment}'");
 
-Console.WriteLine($"{DateTime.Now.ToString(DateTimeLogFormat)}, StartUp");
-
-if (ASPNETCORE_ENVIRONMENT == "Development") { app.UseExceptionHandler("/Error"); }
+if (IsDevelopment) { app.UseExceptionHandler("/Error"); }
 
 app.UseStaticFiles();
 app.UseRouting();
 app.MapRazorPages();
 
+List<string> PSModulePath = app.Configuration.GetSection("PSModulePath").GetChildren().Select(x => x.Value!.ToString()).ToList<string>();
+if (PSModulePath.Count > 0) {
+    string PSModulePathStr = System.String.Join(";",PSModulePath);
+    System.Environment.SetEnvironmentVariable("PSModulePath",PSModulePathStr);
+}
+
 string ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
 var ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
+string PwShUrl = app.Configuration.GetValue("PwShUrl", "PowerShell")!;
 var CachedVariables = app.Configuration.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
 var PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren().ToList();
 string UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
@@ -69,32 +72,18 @@ ScriptLoader();
 
 app.Map("/check", async (HttpContext Context) =>
     {
-        JsonObject.ConvertToJsonContext jsonContext = new JsonObject.ConvertToJsonContext(maxDepth: 5, enumsAsStrings: false, compressOutput: false);
-        
-        Dictionary<string,object> Output = new();
-        List<string> SettingFiles = new() {
-            "appsettings.json",
-            "appsettings.Development.json",
-        };
 
-        foreach (string SettingFile_ in SettingFiles) {
-            bool success = true;
-            string ErrorMessage = "";
-            try {
-                string FileContent = File.ReadAllText(SettingFile_);
-                var obj = JsonObject.ConvertFromJson(FileContent, out ErrorRecord error);
-            } catch (Exception e) {
-                ErrorMessage = e.Message;
-                success = false;
-            }
-
-            Output[SettingFile_] =  new Dictionary<string,object> () {
-                ["Success"] = success,
-                ["Error"] = ErrorMessage,
-            };
+        bool success = true;
+        string ErrorMessage = "";
+        try {
+            string FileContent = File.ReadAllText("appsettings.json");
+            var obj = JsonObject.ConvertFromJson(FileContent, out ErrorRecord error);
+        } catch (Exception e) {
+            ErrorMessage = e.Message;
+            success = false;
         }
 
-        await Context.Response.WriteAsJsonAsync(Output, jOptions);
+        await Context.Response.WriteAsJsonAsync(new { Success = success, Error = ErrorMessage }, jOptions);
     }
 );
 
@@ -103,7 +92,7 @@ app.Map("/whoami", async (HttpContext Context) =>
         Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
         var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
         string AuthorizationHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization").Select(x => x.Key).FirstOrDefault("");
-        if (Headers.ContainsKey(AuthorizationHeader)) { Headers[AuthorizationHeader] = "***"; }
+        if (Headers.ContainsKey(AuthorizationHeader)) { Headers[AuthorizationHeader] = $"{Context.User.Identity!.AuthenticationType} ***"; }
 
         Dictionary<String, object> UserInfo = new()
         {
@@ -136,12 +125,12 @@ app.Map("/logout", async (HttpContext Context) =>
 app.Map("/reload", async (HttpContext Context) =>
     {
         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
-
-        if (!UserIsInRoleAdmin) {
-            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
-        } else {
+        IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
+        if (UserIsInRoleAdmin || IsDevelopment) {
             ScriptLoader();
             await Context.Response.WriteAsJsonAsync(new { Success = true, Error = "" }, jOptions);
+        } else {
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
         }
     }
 );
@@ -149,62 +138,63 @@ app.Map("/reload", async (HttpContext Context) =>
 app.Map("/clear", async (HttpContext Context) =>
     {
         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
-
-        if (!UserIsInRoleAdmin) {
-            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
-        } else {
+        IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
+        if (UserIsInRoleAdmin || IsDevelopment) {
             ClearCache();
             await Context.Response.WriteAsJsonAsync(new { Success = true, Error = "" }, jOptions);
+        } else {
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
         }
     }
 );
 
-app.Map("/PowerShell/", async (HttpContext Context) =>
+app.Map($"/{PwShUrl}/", async (HttpContext Context) =>
     {
         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
         bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
 
-        Console.WriteLine($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL: '/PowerShell/', UserName: '{Context.User.Identity.Name}'");
+        Console.WriteLine($"DateTime:'{DateTime.Now.ToString(DateTimeLogFormat)}', Path:'{Context.Request.Path}', QueryString:'{Context.Request.QueryString}', UserName:'{Context.User.Identity!.Name}'");
 
         System.Text.RegularExpressions.Regex regex = new Regex(@"^[a-z0-9]", RegexOptions.IgnoreCase);
 
-        if (!(UserIsInRoleAdmin || UserIsInRoleUser)) {
-            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
-        } else {
-            Dictionary<string,List<string>> Wrappers = ScriptCache.Where(x => UserIsInRoleAdmin || regex.IsMatch(x.Key)).ToDictionary(x => x.Key, x => x.Value.Keys.ToList());
+        if (UserIsInRoleAdmin || UserIsInRoleUser || IsDevelopment) {
+            Dictionary<string,List<string>> Wrappers = ScriptCache.Where(x => IsDevelopment || UserIsInRoleAdmin || regex.IsMatch(x.Key)).ToDictionary(x => x.Key, x => x.Value.Keys.ToList());
             await Context.Response.WriteAsJsonAsync(new { Success = true, Data = Wrappers}, jOptions);
+        } else {
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
         }
     }
 );
 
-app.Map("/PowerShell/{Wrapper}", async (string Wrapper, HttpContext Context) =>
+app.Map($"/{PwShUrl}/{{Wrapper}}", async (string Wrapper, HttpContext Context) =>
     {
         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
         bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
+        IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
+        Console.WriteLine($"DateTime:'{DateTime.Now.ToString(DateTimeLogFormat)}', Path:'{Context.Request.Path}', QueryString:'{Context.Request.QueryString}', UserName:'{Context.User.Identity!.Name}'");
 
-        Console.WriteLine($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL: '/PowerShell/{Wrapper}', UserName: '{Context.User.Identity.Name}'");
-
-        if (!(UserIsInRoleAdmin || UserIsInRoleUser)) {
-            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
-        } else {
+        if (UserIsInRoleAdmin || UserIsInRoleUser || IsDevelopment) {
             List<string> Scripts = new();
             if (ScriptCache.ContainsKey(Wrapper)) {Scripts = ScriptCache[Wrapper].Keys.ToList();}
             await Context.Response.WriteAsJsonAsync(new { Success = true, Data = Scripts }, jOptions);
+        } else {
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
         }
     }
 );
 
-app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, HttpContext Context) =>
+app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Script, HttpContext Context) =>
     {
         Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
+
         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
         bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
         bool WrapperPermission = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
-
-        if (!(UserIsInRoleAdmin || UserIsInRoleUser)) {
-            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied: user" }, jOptions);
-        } else if (!WrapperPermission) {
-            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied: wrapper" }, jOptions);
+        IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
+        if (!(UserIsInRoleAdmin || UserIsInRoleUser) && !IsDevelopment) {
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied: user permission" }, jOptions);
+        } else if (!WrapperPermission && !IsDevelopment) {
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied: wrapper permission" }, jOptions);
         } else {
             ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
             string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
@@ -218,26 +208,24 @@ app.Map("/PowerShell/{Wrapper}/{Script}", async (string Wrapper, string Script, 
             } else if (!File.Exists(ScriptFile)) {
                 await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Script '{Script}' not found on disk, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all" }, jOptions);
             } else {
-                var Query = Context.Request.Query.ToDictionary(x => x.Key, x => x.Value.ToString());
-                
-
-                Console.WriteLine($"{DateTime.Now.ToString(DateTimeLogFormat)}, URL: '/PowerShell/{Wrapper}/{Script}', UserName: '{Context.User.Identity.Name}'");
-
+                Console.WriteLine($"DateTime:'{DateTime.Now.ToString(DateTimeLogFormat)}', Path:'{Context.Request.Path}', QueryString:'{Context.Request.QueryString}', UserName:'{Context.User.Identity!.Name}'");
                 var streamReader = new StreamReader(Context.Request.Body, encoding: System.Text.Encoding.UTF8);
                 string Body = await streamReader.ReadToEndAsync();
-                string OutputString = PSScriptRunner(Wrapper, Script, Query, Body, Context);
+                string OutputString = PSScriptRunner(Wrapper, Script, Body, Context);
                 await Context.Response.WriteAsync(OutputString);
             }
         }
     }
 );
 
-string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> Query, string Body, HttpContext Context) {
+string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Context) {
     ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
     PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren().ToList();
     UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
-
+    var Query = Context.Request.Query.ToDictionary(x => x.Key, x => x.Value.ToString());
     var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
+    string AuthorizationHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization").Select(x => x.Key).FirstOrDefault("");
+    if (Headers.ContainsKey(AuthorizationHeader)) { Headers[AuthorizationHeader] = $"{Context.User.Identity!.AuthenticationType} ***"; }
 
     int maxDepth = app.Configuration.GetValue("JsonSerialization:maxDepth", 4);
     bool enumsAsStrings = app.Configuration.GetValue("JsonSerialization:enumsAsStrings", true);
@@ -282,13 +270,17 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         Dictionary<string,object> SqlLogParam = new()
         {
             ["PID"] = Process.GetCurrentProcess().Id,
+            ["IPAddress"] = $"{Context.Connection.RemoteIpAddress}",
             ["Method"] = Context.Request.Method,
             ["Wrapper"] = Wrapper,
             ["Script"] = Script,
-            ["Body"] = Body,
-            ["IPAddress"] = $"{Context.Connection.RemoteIpAddress}",
         };
-        if (Context.User.Identity.Name is not null) {
+        
+        if (app.Configuration.GetValue("SqlLogging:Fields:Headers", true)) {SqlLogParam["Headers"] = ConvertToJson(Headers,compressOutput:true);}
+        if (app.Configuration.GetValue("SqlLogging:Fields:Query", true)) {SqlLogParam["Query"] = ConvertToJson(Query,compressOutput:true);}
+        if (app.Configuration.GetValue("SqlLogging:Fields:Body", true)) {SqlLogParam["Body"] = Body;}
+        
+        if (Context.User.Identity!.Name is not null) {
             SqlLogParam["UserName"] = Context.User.Identity.Name;
         }
         try {
@@ -300,7 +292,7 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
 
     if (SqlLoggingEnabled && AbortScriptOnSqlFailure && SqlLogOutput.Count < 1) {
         success = false;
-        error = $"SQL Failure";
+        error = $"SQL Error";
     } else {
         var initialSessionState = System.Management.Automation.Runspaces.InitialSessionState.CreateDefault();
         string conf_ExecPol = app.Configuration.GetValue("ExecutionPolicy", "Unrestricted")!;
@@ -317,7 +309,7 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
 
             PSCredential UserCredential = null!;
             
-            if (Context.User.Identity.AuthenticationType is not null && Context.User.Identity.AuthenticationType.ToString().ToLower() == "basic") {
+            if (Context.User.Identity!.AuthenticationType is not null && Context.User.Identity!.AuthenticationType.ToString().ToLower() == "basic") {
                 var Encoding = System.Text.Encoding.GetEncoding("utf-8");
                 string Authorization = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization")
                     .Select(x => Regex.Replace(x.Value.ToString(),@"^basic\s*","",RegexOptions.IgnoreCase))
@@ -348,95 +340,140 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         PwSh.AddParameter("Body", Body);
         PwSh.AddParameter("Context", Context);
 
+        DateTime BeginDate = DateTime.Now;
+
         try {
-            DateTime BeginDate = DateTime.Now;
             PSObjects = PwSh.Invoke();
-            DateTime EndDate = DateTime.Now;
-            
             Streams.Add("PSObjects", PSObjects);
             HadErrors = PwSh.HadErrors;
             Streams.Add("HadErrors", HadErrors);
-
-            foreach (var Stream in PwSh.Streams.Error) {
-                var InvocationInfo = Stream.InvocationInfo;
-                var ExceptionInfo = Stream.Exception;
-                Dictionary<String, Object> NewInvocationInfo = new()
-                {
-                    ["ScriptName"] = $"{InvocationInfo.ScriptName}",
-                    ["ScriptLineNumber"] = InvocationInfo.ScriptLineNumber,
-                    ["Line"] = InvocationInfo.Line,
-                    ["PositionMessage"] = $"{InvocationInfo.PositionMessage}",
-                    ["PipelineLength"] = $"{InvocationInfo.PipelineLength}",
-                    ["PipelinePosition"] = $"{InvocationInfo.PipelinePosition}"
-                };
-                Dictionary<String, Object> NewExceptionInfo = new()
-                {
-                    ["Message"] = $"{ExceptionInfo.Message}",
-                    ["Source"] = $"{ExceptionInfo.Source}"
-                };
-                Dictionary<String, Object> StreamDictionary = new()
-                {
-                    ["Exception"] = NewExceptionInfo,
-                    ["InvocationInfo"] = NewInvocationInfo,
-                    ["TargetObject"] = $"{Stream.TargetObject}",
-                    ["FullyQualifiedErrorId"] = $"{Stream.FullyQualifiedErrorId}"
-                };
-                ErrorList.Add(StreamDictionary);
-            }
-            
-            foreach (var Stream in PwSh.Streams.Warning) {
-                var InvocationInfo = Stream.InvocationInfo;
-                Dictionary<String, Object> NewInvocationInfo = new()
-                {
-                    ["Source"] = $"{InvocationInfo.MyCommand.Source}",
-                    ["PositionMessage"] = $"{InvocationInfo.PositionMessage}"
-                };
-                Dictionary<String, Object> StreamDictionary = new()
-                {
-                    ["Message"] = Stream.Message,
-                    ["InvocationInfo"] = NewInvocationInfo
-                };
-                WarningList.Add(StreamDictionary);
-            }
-
-            foreach (var Stream in PwSh.Streams.Verbose) {
-                var InvocationInfo = Stream.InvocationInfo;
-                Dictionary<String, Object> NewInvocationInfo = new()
-                {
-                    ["Source"] = $"{InvocationInfo.MyCommand.Source}",
-                    ["PositionMessage"] = $"{InvocationInfo.PositionMessage}"
-                };
-                Dictionary<String, Object> StreamDictionary = new()
-                {
-                    ["Message"] = Stream.Message,
-                    ["InvocationInfo"] = NewInvocationInfo
-                };
-                VerboseList.Add(StreamDictionary);
-            }
-
-            foreach (var Stream in PwSh.Streams.Information) {
-                Dictionary<String, Object> StreamDictionary = new()
-                {
-                    ["Source"] = $"{Stream.Source}",
-                    ["TimeGenerated"] = $"{Stream.TimeGenerated}",
-                    ["MessageData"] = Stream.MessageData
-                };
-                InformationList.Add(StreamDictionary);
-            }
-
-            Streams["Error"] = ErrorList;
-            Streams["Warning"] = WarningList;
-            Streams["Verbose"] = VerboseList;
-            Streams["Information"] = InformationList;
-            Streams["Debug"] = PwSh.Streams.Debug;
-            
-            StateInfo["Duration"] = (EndDate - BeginDate).TotalSeconds;
-            StateInfo["State"] = $"{PwSh.InvocationStateInfo.State}";
-            StateInfo["Reason"] = $"{PwSh.InvocationStateInfo.Reason}";
-
         } catch (Exception e) {
             error = $"{e.Message}";
             success = false;
+        }
+
+        try {
+            foreach (var Stream in PwSh.Streams.Error) {
+                try {
+                    var InvocationInfo = Stream.InvocationInfo;
+                    var ExceptionInfo = Stream.Exception;
+                    Dictionary<String, Object> NewExceptionInfo = new()
+                    {
+                        ["Message"] = $"{ExceptionInfo.Message}",
+                        ["Source"] = $"{ExceptionInfo.Source}"
+                    };
+                    Dictionary<String, Object> StreamDictionary = new()
+                    {
+                        ["Exception"] = NewExceptionInfo,
+                        ["TargetObject"] = $"{Stream.TargetObject}",
+                        ["FullyQualifiedErrorId"] = $"{Stream.FullyQualifiedErrorId}"
+                    };
+                    if (InvocationInfo is not null) {
+                        Dictionary<String, Object> NewInvocationInfo = new()
+                        {
+                            ["ScriptName"] = $"{InvocationInfo.ScriptName}",
+                            ["ScriptLineNumber"] = InvocationInfo.ScriptLineNumber,
+                            ["Line"] = InvocationInfo.Line,
+                            ["PositionMessage"] = $"{InvocationInfo.PositionMessage}",
+                            ["PipelineLength"] = $"{InvocationInfo.PipelineLength}",
+                            ["PipelinePosition"] = $"{InvocationInfo.PipelinePosition}"
+                        };
+                        StreamDictionary["InvocationInfo"] = NewInvocationInfo;
+                    } else {
+                        StreamDictionary["InvocationInfo"] = new Dictionary<String, Object>();
+                    }
+                    ErrorList.Add(StreamDictionary);
+                } catch (Exception e) {
+                    success = false;
+                    ResultTable["Error"] = $"{e}";
+                }
+            }
+            if (app.Configuration.GetValue("JsonSerialization:Fields:Error",true)) {Streams["Error"] = ErrorList;} else {Streams["Error"] = new List<Object>();}
+        } catch (Exception e) {
+            success = false;
+            ResultTable["Error"] = $"{e}";
+        }
+            
+        try {
+            foreach (var Stream in PwSh.Streams.Warning) {
+                try {
+                    var InvocationInfo = Stream.InvocationInfo;
+                    Dictionary<String, Object> NewInvocationInfo = new()
+                    {
+                        ["Source"] = $"{InvocationInfo.MyCommand.Source}",
+                        ["PositionMessage"] = $"{InvocationInfo.PositionMessage}"
+                    };
+                    Dictionary<String, Object> StreamDictionary = new()
+                    {
+                        ["Message"] = Stream.Message,
+                        ["InvocationInfo"] = NewInvocationInfo
+                    };
+                    WarningList.Add(StreamDictionary);
+                } catch (Exception e) {
+                    success = false;
+                    ResultTable["Error"] = $"{e}";
+                }
+            }
+            if (app.Configuration.GetValue("JsonSerialization:Fields:Warning",true)) {Streams["Warning"] = WarningList;} else {Streams["Warning"] = new List<Object>();}
+        } catch (Exception e) {
+            success = false;
+            ResultTable["Error"] = $"{e}";
+        }
+            
+        try {
+            foreach (var Stream in PwSh.Streams.Verbose) {
+                try {
+                    var InvocationInfo = Stream.InvocationInfo;
+                    Dictionary<String, Object> NewInvocationInfo = new()
+                    {
+                        ["Source"] = $"{InvocationInfo.MyCommand.Source}",
+                        ["PositionMessage"] = $"{InvocationInfo.PositionMessage}"
+                    };
+                    Dictionary<String, Object> StreamDictionary = new()
+                    {
+                        ["Message"] = Stream.Message,
+                        ["InvocationInfo"] = NewInvocationInfo
+                    };
+                    VerboseList.Add(StreamDictionary);
+                } catch (Exception e) {
+                    success = false;
+                    ResultTable["Error"] = $"{e}";
+                }
+            }
+            if (app.Configuration.GetValue("JsonSerialization:Fields:Verbose",true)) {Streams["Verbose"] = VerboseList;} else {Streams["Verbose"] = new List<Object>();}
+        } catch (Exception e) {
+            success = false;
+            ResultTable["Error"] = $"{e}";
+        }
+
+        try {
+            foreach (var Stream in PwSh.Streams.Information) {
+                try {
+                    Dictionary<String, Object> StreamDictionary = new()
+                    {
+                        ["Source"] = $"{Stream.Source}",
+                        ["TimeGenerated"] = $"{Stream.TimeGenerated}",
+                        ["MessageData"] = Stream.MessageData
+                    };
+                    InformationList.Add(StreamDictionary);
+                } catch (Exception e) {
+                    success = false;
+                    ResultTable["Error"] = $"{e}";
+                }
+            }
+            if (app.Configuration.GetValue("JsonSerialization:Fields:Information",true)) {Streams["Information"] = InformationList;} else {Streams["Information"] = new List<Object>();}
+        } catch (Exception e) {
+            success = false;
+            ResultTable["Error"] = $"{e}";
+        }
+        
+        try {
+            StateInfo["State"] = $"{PwSh.InvocationStateInfo.State}";
+            DateTime EndDate = DateTime.Now;
+            StateInfo["Duration"] = (EndDate - BeginDate).TotalSeconds;
+        } catch (Exception e) {
+            success = false;
+            ResultTable["Error"] = $"{e}";
         }
 
         try {
@@ -449,10 +486,9 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
 
     }
 
-    try
-    {
-        ResultTable["Success"] = success;
+    try {
         ResultTable["Error"] = error;
+        ResultTable["Success"] = success;
         ResultTable["Streams"] = Streams;
         ResultTable["InvocationStateInfo"] = StateInfo;
         PSOutputString = ConvertToJson(ResultTable,maxDepth:maxDepth,enumsAsStrings:enumsAsStrings,compressOutput:compressOutput,RaiseError:true);
@@ -466,12 +502,8 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
         PSOutputString = ConvertToJson(ResultTable,maxDepth:maxDepth,enumsAsStrings:enumsAsStrings,compressOutput:compressOutput,RaiseError:false);
     }
 
+
     if (SqlLoggingEnabled && SqlLogOutput.Count > 0) {
-        string PSObjectsJson = ConvertToJson(PSObjects,maxDepth:4,enumsAsStrings:true,compressOutput:true,RaiseError:false);
-        string ErrorListJson = ConvertToJson(ErrorList,maxDepth:3,enumsAsStrings:true,compressOutput:true,RaiseError:false);
-        string WarningListJson = ConvertToJson(WarningList,maxDepth:3,enumsAsStrings:true,compressOutput:true,RaiseError:false);
-        string InformationListJson = ConvertToJson(InformationList,maxDepth:3,enumsAsStrings:true,compressOutput:true,RaiseError:false);
-        string VerboseListJson = ConvertToJson(VerboseList,maxDepth:3,enumsAsStrings:true,compressOutput:true,RaiseError:false);
 
         Dictionary<string,object> SqlLogParam = new()
         {
@@ -480,12 +512,13 @@ string PSScriptRunner(string Wrapper, string Script, Dictionary<String, String> 
             ["Error"] = error,
             ["Success"] = success,
             ["HadErrors"] = HadErrors,
-            ["PSObjects"] = PSObjectsJson,
-            ["StreamError"] = ErrorListJson,
-            ["StreamWarning"] = WarningListJson,
-            ["StreamInformation"] = InformationListJson,
-            ["StreamVerbose"] = VerboseListJson
         };
+
+        if (app.Configuration.GetValue("SqlLogging:Fields:PSObjects", true)) {SqlLogParam["PSObjects"] = ConvertToJson(PSObjects,compressOutput:true,RaiseError:false);}
+        if (app.Configuration.GetValue("SqlLogging:Fields:StreamError", true)) {SqlLogParam["StreamError"] = ConvertToJson(ErrorList,compressOutput:true,RaiseError:false);}
+        if (app.Configuration.GetValue("SqlLogging:Fields:StreamWarning", true)) {SqlLogParam["StreamWarning"] = ConvertToJson(WarningList,compressOutput:true,RaiseError:false);}
+        if (app.Configuration.GetValue("SqlLogging:Fields:StreamInformation", true)) {SqlLogParam["StreamInformation"] = ConvertToJson(InformationList,compressOutput:true,RaiseError:false);}
+        if (app.Configuration.GetValue("SqlLogging:Fields:StreamVerbose", true)) {SqlLogParam["StreamVerbose"] = ConvertToJson(VerboseList,compressOutput:true,RaiseError:false);}
 
         SqlHelper(SqlTable,SqlLogParam,"UPDATE",SqlConnectionString,PrimaryKey:"id");
     }
@@ -511,7 +544,7 @@ string ConvertToJson(object data, int maxDepth = 4, bool enumsAsStrings = true, 
 }
 
 void SqlTableCreate(string SqlTable, string ConnectionString) {
-    string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [PID] int NULL, [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Body] [text] NULL, [Error] [nvarchar](512) NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamVerbose] [text] NULL, [StreamInformation] [text] NULL )";
+    string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [PID] int NULL, [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Headers] [text] NULL, [Query] [text] NULL, [Body] [text] NULL, [Error] [text] NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamInformation] [text] NULL, [StreamVerbose] [text] NULL )";
     var Connection = new OdbcConnection(SqlConnectionString);
     var Command = new OdbcCommand(SqlQuery, Connection);
     System.Data.Odbc.OdbcDataAdapter DataAdapter = new();
@@ -604,7 +637,6 @@ Dictionary<String, List<String>> ScriptLoader() {
 }
  
 void ClearCache() {
-
     ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
     ScriptCache = new Dictionary<String, Dictionary<String, Dictionary<String, object>>>();
     CachedVariables = app.Configuration.GetSection("CachedVariables").GetChildren().ToArray().Select(x => x.Value!.ToString()).ToList();
@@ -625,4 +657,3 @@ void ClearCache() {
 }
 
 await app.RunAsync();
-

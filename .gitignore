@@ -1,8 +1,9 @@
 .vs
 .vscode
-logs
 bin
 obj
+logs
+.scripts/*/Transcript
 *.bak
 *.zip
 *.dib

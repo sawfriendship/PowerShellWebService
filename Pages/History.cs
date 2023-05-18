@@ -4,12 +4,12 @@ using System.Linq;
 
 namespace PowerShellWebService.Pages;
 
-public class IndexModel : PageModel
+public class HistoryModel : PageModel
 {
     private readonly IConfiguration Configuration;
     private readonly IWebHostEnvironment Environment;
 
-    public IndexModel(IConfiguration conf, IWebHostEnvironment env)
+    public HistoryModel(IConfiguration conf, IWebHostEnvironment env)
     {
         this.Configuration = conf;
         this.Environment = env;
@@ -18,6 +18,7 @@ public class IndexModel : PageModel
     public string UserName { get; private set; } = "";
     public bool IsAuthenticated { get; private set; } = false;
     public bool IsDevelopment { get; private set; } = false;
+    public bool SqlLoggingEnabled { get; private set; } = false;
     public bool UserIsInRoleAdmin { get; private set; } = false;
     public bool UserIsInRoleUser { get; private set; } = false;
 
@@ -27,7 +28,9 @@ public class IndexModel : PageModel
         UserName = HttpContext.User.Identity!.Name ?? "%UserName%";
         IsAuthenticated = HttpContext.User.Identity.IsAuthenticated;
         IsDevelopment = Configuration.GetValue("IsDevelopment",false);
+        SqlLoggingEnabled = Configuration.GetValue("SqlLogging:Enabled", false);
         UserIsInRoleAdmin = Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => HttpContext.User.IsInRole(x));
         UserIsInRoleUser = Configuration.GetSection("Roles:User").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => HttpContext.User.IsInRole(x));
     }
 }
+

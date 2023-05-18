@@ -6,4 +6,4 @@ Write-Host 'host!!!' -verb
 Write-Verbose 'verb!!!' -verb
 Write-Debug 'debug!!!' -verb
 
-# throw 'throw!!!'
+throw 'throw!!!'

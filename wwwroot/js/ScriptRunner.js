@@ -7,9 +7,10 @@ function has_key(obj,key){
 }
 
 function load_wrapper_form() {
-    $('#_wrapper').html($(`<option value="">---</option>`))
+    var PwShUrl = $('#conf input[name=PwShUrl]').val();
+    $('#_wrapper').html($(`<option value="">---</option>`));
     $.ajax({
-        url: '/PowerShell/',
+        url: `/${PwShUrl}/`,
         method: 'GET',
         cache: true,
         contentType: 'application/json; charset=utf-8',
@@ -42,10 +43,11 @@ function load_wrapper_form() {
 }
 
 function load_script_form(wrapper) {
-    $('#_script').html($(`<option value="">---</option>`))
+    var PwShUrl = $('#conf input[name=PwShUrl]').val();
+    $('#_script').html($(`<option value="">---</option>`));
     if (wrapper) {
         $.ajax({
-            url: `/PowerShell/${wrapper}`,
+            url: `/${PwShUrl}/${wrapper}`,
             method: 'GET',
             cache: true,
             contentType: 'application/json; charset=utf-8',
@@ -139,7 +141,8 @@ function toggle_param(item) {
 };
 
 function update_url() {
-    var url = '/PowerShell'
+    var PwShUrl = $('#conf input[name=PwShUrl]').val();
+    var url = `/${PwShUrl}`;
     var wrapper = $('#_wrapper').val()
     if (wrapper) {url = `${url}/${wrapper}`}
     var script = $('#_script').val()
@@ -150,6 +153,7 @@ function update_url() {
 }
 
 function send_body() {
+    var PwShUrl = $('#conf input[name=PwShUrl]').val();
     $('._btn_send').addClass('disabled')
     $('#_result').addClass('processing')
     $('#_result').removeClass('border-success _result_success border-danger _result_error')
@@ -159,7 +163,7 @@ function send_body() {
     var outputtype = $('._outputtype').val()
     var wrapper = $('#_wrapper').val()
     var script = $('#_script').val()
-    url = `/PowerShell/${wrapper}/${script}`
+    var url = `/${PwShUrl}/${wrapper}/${script}`
     var request = {
         url: url,
         method: method,

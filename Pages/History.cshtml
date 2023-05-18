@@ -1,0 +1,23 @@
+﻿@page
+@model HistoryModel
+
+@{
+    ViewData["Title"] = "History";
+}
+@* <h1>@ViewData["Title"]</h1> *@
+
+@if (!@Model.IsAuthenticated && !@Model.IsDevelopment) {
+    <div class="text-center"><h3>Вы не авторизованы</h3></div>
+} else if (!(@Model.UserIsInRoleAdmin || @Model.UserIsInRoleUser) && !@Model.IsDevelopment) {
+    <div class="text-center"><h3>У вас нет прав на просмотр этой страницы</h3></div>
+} else {
+    if (@Model.IsDevelopment) {
+        <h3 style="color:red;">Включен режим разработки, права пользователей не учитываются!</h3>
+    }
+    if (!@Model.SqlLoggingEnabled) {
+        <h3>Чтение журнала возможно только при ведении SQL-лога</h3>
+    } else {
+        <div>ok</div>
+    }
+    
+}

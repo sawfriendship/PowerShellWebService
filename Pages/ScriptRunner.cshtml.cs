@@ -7,20 +7,28 @@ namespace PowerShellWebService.Pages;
 public class ScriptRunnerModel : PageModel
 {
     private readonly IConfiguration Configuration;
+    private readonly IWebHostEnvironment Environment;
 
-    public ScriptRunnerModel(IConfiguration configuration)
+    public ScriptRunnerModel(IConfiguration conf, IWebHostEnvironment env)
     {
-        Configuration = configuration;
+        this.Configuration = conf;
+        this.Environment = env;
     }
 
     public string UserName { get; private set; } = "";
+    public bool IsAuthenticated { get; private set; } = false;
+    public bool IsDevelopment { get; private set; } = false;
+    public string PwShUrl { get; private set; } = "";
     public bool UserIsInRoleAdmin { get; private set; } = false;
     public bool UserIsInRoleUser { get; private set; } = false;
 
     public void OnGet()
     {
         var User = HttpContext.User;
-        UserName = HttpContext.User.Identity.Name ?? "%UserName%";
+        UserName = HttpContext.User.Identity!.Name ?? "%UserName%";
+        IsAuthenticated = HttpContext.User.Identity.IsAuthenticated;
+        IsDevelopment = Configuration.GetValue("IsDevelopment",false);
+        PwShUrl = Configuration.GetValue("PwShUrl","PowerShell")!;
         UserIsInRoleAdmin = Configuration.GetSection("Roles:Admin").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => HttpContext.User.IsInRole(x));
         UserIsInRoleUser = Configuration.GetSection("Roles:User").GetChildren().ToList().Select(x => x.Value!.ToString()).Any(x => HttpContext.User.IsInRole(x));
     }

@@ -6,18 +6,17 @@ param(
 )
 
 # Using checks
-. $PSScriptRoot\middleware\is_localhost.ps1
+# . $PSScriptRoot\middleware\checks.ps1
 
 # Using global var, that configured in CachedVariables section of config.json file
 if (!$Global:StartUp) {$Global:StartUp = Get-Date}
 
-
-if ($Context.Request.Method -eq 'GET') {
-	[hashtable]$Params = $Query
-} else {
-	[hashtable]$Params = ConvertFrom-Json -InputObject $Body -AsHashtable   
-}
+$ScriptItem = Get-Item -Path $ScriptFile
+$ScriptName = $ScriptItem.BaseName
+Start-Transcript -Path "$PSScriptRoot\Transcript\$ScriptName\$((Get-Date).ToString('yyyy-MM-dd'))\$((Get-Date).ToString('yyyy-MM-dd_HH-mm-ss-ffffff')).txt" -Force | Out-Null
 
 Set-Alias -Name 'Script' -Value $ScriptFile
 
 Script @Params
+
+Stop-Transcript | Out-Null
