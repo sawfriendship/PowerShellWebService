@@ -45,7 +45,7 @@
                         <select id="_script" name="_script" class="form-select" disabled></select>
                     </form>
                 </div>
-                @if (@Model.UserIsInRoleAdmin)
+                @if (@Model.UserIsInRoleAdmin || @Model.IsDevelopment)
                 {
                     <div class="mb-3">
                         <button type="button" class="_btn_reload btn btn-dark btn-outline-success" style="width:49%">Reload Cache</button>

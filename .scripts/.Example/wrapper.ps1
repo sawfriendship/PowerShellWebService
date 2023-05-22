@@ -8,6 +8,10 @@ param(
 # Using checks
 # . $PSScriptRoot\middleware\checks.ps1
 
+if ($Body) {
+	[hashtable]$Params = ConvertFrom-Json -InputObject $Body -AsHashtable   
+}
+
 # Using global var, that configured in CachedVariables section of config.json file
 if (!$Global:StartUp) {$Global:StartUp = Get-Date}
 

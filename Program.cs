@@ -3,7 +3,8 @@ using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Text.Json;
-using System.Data.Odbc;
+using System.Data;
+using System.Data.SqlClient;
 using System.Data.Common;
 using System.Security;
 using System.Security.AccessControl;
@@ -152,7 +153,7 @@ app.Map($"/{PwShUrl}/", async (HttpContext Context) =>
     {
         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
         bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
-
+        IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
         Console.WriteLine($"DateTime:'{DateTime.Now.ToString(DateTimeLogFormat)}', Path:'{Context.Request.Path}', QueryString:'{Context.Request.QueryString}', UserName:'{Context.User.Identity!.Name}'");
 
         System.Text.RegularExpressions.Regex regex = new Regex(@"^[a-z0-9]", RegexOptions.IgnoreCase);
@@ -217,6 +218,41 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Scri
         }
     }
 );
+
+// app.Map("/log", async (HttpContext Context) =>
+//     {
+//         Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
+
+//         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
+//         bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
+        
+//         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
+//         SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
+//         SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
+//         List<string> SearchColumns = new() {"id","wrapper","script","ipaddress"};
+
+//         Dictionary<string,object> SearchParams = new();
+//         foreach (var _ in Context.Request.Query) {
+//             if (SearchColumns.Contains(_.Key.ToLower())) {
+//                 SearchParams[_.Key] = _.Value;
+//             }
+//         }
+//         // Context.Request.Query.ToList().Where(x => SearchColumns.Contains(x.Key.ToLower())).ToDictionary(x => $"{x.Key}", x => $"{x.Value}")
+//         string Limit = Context.Request.Query.Where(x => x.Key.ToLower() == "limit").Select(x => x.Key).FirstOrDefault("10");
+//         // int Limit = 10;
+//         // try {
+//         //     Limit = Convert.ToInt32(LimitStr);
+//         // } catch {}
+
+//         if (!(UserIsInRoleAdmin || UserIsInRoleUser) && !IsDevelopment) {
+//             await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
+//         } else {
+//             var SqlData = SqlHelper(SqlTable,SearchParams,"select",SqlConnectionString);
+//             await Context.Response.WriteAsync("qwe");
+//         }
+//     }
+// );
+
 
 string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Context) {
     ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
@@ -545,12 +581,12 @@ string ConvertToJson(object data, int maxDepth = 4, bool enumsAsStrings = true, 
 
 void SqlTableCreate(string SqlTable, string ConnectionString) {
     string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [PID] int NULL, [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Headers] [text] NULL, [Query] [text] NULL, [Body] [text] NULL, [Error] [text] NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamInformation] [text] NULL, [StreamVerbose] [text] NULL )";
-    var Connection = new OdbcConnection(SqlConnectionString);
-    var Command = new OdbcCommand(SqlQuery, Connection);
-    System.Data.Odbc.OdbcDataAdapter DataAdapter = new();
-    DataAdapter.SelectCommand = Command;
+    var connection = new System.Data.SqlClient.SqlConnection(SqlConnectionString);
+    var command = new System.Data.SqlClient.SqlCommand(SqlQuery, connection);
+    System.Data.SqlClient.SqlDataAdapter adapter = new();
+    adapter.SelectCommand = command;
     System.Data.DataSet DataSet = new();
-    DataAdapter.Fill(DataSet);
+    adapter.Fill(DataSet);
 }
 
 Dictionary<string,object> SqlHelper(string SqlTable, Dictionary<string,object> Params, string Operation, string ConnectionString, string PrimaryKey = "id") {
@@ -559,31 +595,30 @@ Dictionary<string,object> SqlHelper(string SqlTable, Dictionary<string,object> P
     string Query = "";
     switch (Operation.ToUpper())
     {
+        case "SELECT":
+            Query = $"SELECT * FROM [{SqlTable.Trim('[',']')}] WHERE 1=1 {String.Join(' ',Params.Keys.Select(x => $" AND [{x}] = @{x}"))}";
+            break;
         case "INSERT":
-            Query = $"INSERT INTO [{SqlTable.Trim('[',']')}] ({String.Join(',',Keys.Select(x => $"[{x}]"))}) OUTPUT INSERTED.* VALUES({String.Join(',',Keys.Select(x => "?"))})";
+            Query = $"INSERT INTO [{SqlTable.Trim('[',']')}] ({String.Join(',',Keys.Select(x => $"[{x}]"))}) OUTPUT INSERTED.* VALUES({String.Join(',',Keys.Select(x => $"@{x}"))})";
             break;
         case "UPDATE":
             if (!Params.ContainsKey(PrimaryKey)) {new Exception($"Params not contains the specified PrimaryKey: '{PrimaryKey}'");}
-            Query = $"UPDATE [{SqlTable.Trim('[',']')}] SET {String.Join(',',Keys.Select(x => $"[{x}]=?"))} OUTPUT INSERTED.* WHERE [{PrimaryKey.Trim('[',']')}] = ?";
+            Query = $"UPDATE [{SqlTable.Trim('[',']')}] SET {String.Join(',',Keys.Select(x => $"[{x}]=@{x}"))} OUTPUT INSERTED.* WHERE [{PrimaryKey.Trim('[',']')}] = @{PrimaryKey}";
             break;
     }
 
-    var Connection = new OdbcConnection(ConnectionString);
-    var Command = new OdbcCommand(Query, Connection);
+    var connection = new System.Data.SqlClient.SqlConnection(ConnectionString);
+    var command = new System.Data.SqlClient.SqlCommand(Query, connection);
     foreach (string Key in Keys) {
-        var Value = Params[Key];
-        if (Value.GetType() == typeof(System.DateTime)) {
-            Command.Parameters.AddWithValue(Key,Value).Scale = 7;
-        } else {
-           Command.Parameters.AddWithValue(Key,Value);
-        }
+        command.Parameters.AddWithValue(Key,Params[Key]);
     }
-    if (Params.ContainsKey(PrimaryKey)) {Command.Parameters.AddWithValue(PrimaryKey,Params[PrimaryKey]);}
 
-    System.Data.Odbc.OdbcDataAdapter DataAdapter = new();
-    DataAdapter.SelectCommand = Command;
+    if (Params.ContainsKey(PrimaryKey)) {command.Parameters.AddWithValue(PrimaryKey,Params[PrimaryKey]);}
+
+    System.Data.SqlClient.SqlDataAdapter adapter = new();
+    adapter.SelectCommand = command;
     System.Data.DataSet DataSet = new();
-    DataAdapter.Fill(DataSet);
+    adapter.Fill(DataSet);
     if (!DataSet.HasErrors) {
         var Table = DataSet.Tables[0];
         var Columns = Table.Columns;
