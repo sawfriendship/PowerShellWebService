@@ -2,19 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    @* <meta name="viewport" content="width=device-width, initial-scale=1.0" /> *@
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@ViewData["Title"] - PowerShellWebService</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    @* <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.css" /> *@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap-icons.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/PowerShellWebService.styles.css" asp-append-version="true" />
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/j2ht/dist/j2ht.js"></script>
 </head>
 <body>
+    
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-dark bg-dark bg-gradient border-bottom box-shadow mb-3">
-            <div class="container">
+            <div class="container container-fluid">
                 <a class="navbar-brand" asp-area="" asp-page="/Index">PowerShellWebService</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
@@ -28,19 +32,23 @@
                         <li class="nav-item">
                             <a class="nav-link text-light" asp-area="" asp-page="/ScriptRunner">ScriptRunner</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-light" asp-area="" asp-page="/History">History</a>
+                        </li>
                     </ul>
                 </div>
             </div>
         </nav>
     </header>
-    <div class="container">
-        <main role="main" class="pb-3">
+
+    <main role="main">
+        <div class="container">
             @RenderBody()
-        </main>
-    </div>
+        </div>
+    </main>
 
     <footer class="border-top footer fixed-bottom text-muted bg-dark">
-        <div class="container">
+        <div class="container container-fluid">
             &copy; 2023 - PowerShellWebService
         </div>
     </footer>

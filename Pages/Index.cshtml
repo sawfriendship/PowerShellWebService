@@ -12,7 +12,7 @@
     <div class="text-center"><h3>У вас нет прав на просмотр этой страницы</h3></div>
 } else {
     if (@Model.IsDevelopment) {
-        <h3 style="color:red;">Включен режим разработки, права пользователей не учитываются!</h3>
+        <div class="text-center text-danger"><h3>Включен режим разработки, права пользователей не учитываются!</h3></div>
     }
     if (@Model.UserIsInRoleAdmin || @Model.IsDevelopment) {
         <h3>Вы зашли в роли администратора</h3>

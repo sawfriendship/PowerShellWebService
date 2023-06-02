@@ -10,6 +10,8 @@ param(
 
 if ($Body) {
 	[hashtable]$Params = ConvertFrom-Json -InputObject $Body -AsHashtable   
+} else {
+    [hashtable]$Params = @{}
 }
 
 # Using global var, that configured in CachedVariables section of config.json file

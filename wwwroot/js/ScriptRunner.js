@@ -157,6 +157,7 @@ function send_body() {
     $('._btn_send').addClass('disabled')
     $('#_result').addClass('processing')
     $('#_result').removeClass('border-success _result_success border-danger _result_error')
+    $('#_result ').val('...')
     ani_send(200);
     var method = $(this).attr('method')
     var depth = $('._depth').val()

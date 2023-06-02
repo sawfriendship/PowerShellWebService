@@ -1,0 +1,131 @@
+﻿@page
+@model HistoryModel
+
+@{
+    ViewData["Title"] = "History";
+}
+@* <h1>@ViewData["Title"]</h1> *@
+
+<div id="conf" style="display:none;">
+    <input name="PwShUrl" value="@Model.PwShUrl">
+</div>
+
+@if (!@Model.IsAuthenticated && !@Model.IsDevelopment) {
+    <div class="text-center"><h3>Вы не авторизованы</h3></div>
+} else if (!(@Model.UserIsInRoleAdmin || @Model.UserIsInRoleUser) && !@Model.IsDevelopment) {
+    <div class="text-center"><h3>У вас нет прав на просмотр этой страницы</h3></div>
+} else {
+    if (@Model.IsDevelopment) {
+        <div class="text-center text-danger"><h3>Включен режим разработки, права пользователей не учитываются!</h3></div>
+    }
+    if (!@Model.SqlLoggingEnabled) {
+        <div class="text-center"><h3>Чтение журнала возможно только при ведении SQL-лога</h3></div>
+    } else {
+        <div class="row row-cols-2 content">
+            <!-- LEFT -->
+            
+            <div id="Param" class="col-xs-12 col-sm-12 col-md-8 col-lg-8 col-xl-4 col-xxl-4">
+                <form>
+                    <div class="input-group input-group-sm w-100">
+
+                        <label for="_load_param" class="form-label w-25">Load Param</label>
+                        <div id="_load_param" class="input-group input-group-sm w-75">
+                            <span class="input-group-text">interval</span>
+                            <input name="_interval" type="number" min="1" max="3600" aria-label="interval" class="form-control" value="5">
+                            <span class="input-group-text">count</span>
+                            <input name="_count" type="number" min="1" max="1000" aria-label="count" class="form-control" value="10">
+                        </div>
+
+                        <label for="_wrapper" class="form-label w-25">Wrapper</label>
+                        <div id="_wrapper" class="input-group input-group-sm w-75">
+                            <select name="_wrapper_op" class="form-select">
+                                <option value="=">=</option><option value="!">!=</option>
+                                <option value="~">like</option><option value="!~">not like</option>
+                            </select>
+                            <input name="_wrapper" type="text" class="form-control w-75">
+                        </div>
+
+                        <label for="_script" class="form-label w-25">Script</label>
+                        <div id="_script" class="input-group input-group-sm w-75">
+                            <select name="_script_op" class="form-select">
+                                <option value="=">=</option><option value="!">!=</option>
+                                <option value="~">like</option><option value="!~">not like</option>
+                            </select>
+                            <input name="_script" type="text" class="form-control w-75">
+                        </div>
+
+                        <label for="_begindate1" class="form-label w-25">Date Begin</label>
+                        <div id="_begindate1" class="input-group input-group-sm w-75">
+                            <select name="_begindate1_op" class="form-select">
+                                <option value=">">&gt;=</option><option value="!<">&gt;</option>
+                                <option value="<">&lt;=</option><option value="!>">&lt;</option>
+                            </select>
+                            <input name="_begindate1" type="datetime-local" class="form-control w-75">
+                        </div>
+
+                        <label for="_begindate2" class="form-label w-25">Date End</label>
+                        <div id="_begindate2" class="input-group input-group-sm w-75">
+                            <select name="_begindate2_op" class="form-select">
+                                <option value=">">&gt;=</option><option value="!<">&gt;</option>
+                                <option value="<">&lt;=</option><option value="!>">&lt;</option>
+                            </select>
+                            <input name="_begindate2" type="datetime-local" class="form-control w-75">
+                        </div>
+
+                        <label for="_username" class="form-label w-25">UserName</label>
+                        <div id="_username" class="input-group input-group-sm w-75">
+                            <select name="_username_op" class="form-select">
+                                <option value="=">=</option><option value="!">!=</option>
+                                <option value=">">&gt;=</option><option value="!<">&gt;</option>
+                                <option value="<">&lt;=</option><option value="!>">&lt;</option>
+                                <option value="~">like</option><option value="!~">not like</option>
+                            </select>
+                            <input name="_username" type="text" aria-label="Value" placeholder="Value" class="form-control w-75">
+                        </div>
+
+                        <label for="_ipaddress" class="form-label w-25">IPAddress</label>
+                        <div id="_ipaddress" class="input-group input-group-sm w-75">
+                            <select name="_ipaddress_op" class="form-select">
+                                <option value="=">=</option><option value="!">!=</option>
+                                <option value="~">like</option><option value="!~">not like</option>
+                            </select>
+                            <input name="_ipaddress" type="text" aria-label="Value" placeholder="Value" class="form-control w-75">
+                        </div>
+
+                    </div>
+                </form>
+                <div id="ParamURL"></div>
+            </div>
+            
+            <!-- RIGHT -->
+            
+            <div class="col-xs-12 col-sm-12 col-md-8 col-lg-8 col-xl-4 col-xxl-4">
+                <div id="LogTable" class="w-100">
+                    <table id="LogTable" class="table table-hover table-striped"></table>
+                    <button type="button" class="_btn_load_more btn btn-secondary w-100" style="100%">More</button>
+                </div>
+            </div>
+        
+        </div>
+
+    }
+}
+
+<script src="~/js/History.js" asp-append-version="true"></script>
+
+<div id="ModalTemplate" class="modal fade w-100" tabindex="-1" role="dialog" aria-labelledby="ModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ModalLabel">Event</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body"></div>
+            <div class="modal-footer">
+                <button type="button" class="_modal_close btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="Modals"></div>

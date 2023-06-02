@@ -40,7 +40,9 @@ string RESPONSE_CONTENT_TYPE = "application/json; charset=utf-8";
 string DateTimeLogFormat = app.Configuration.GetValue("DateTimeLogFormat", "yyyy-MM-dd HH:mm:ss")!;
 Console.WriteLine($"StartUp:'{DateTime.Now.ToString(DateTimeLogFormat)}', IsDevelopment:'{IsDevelopment}'");
 
-if (IsDevelopment) { app.UseExceptionHandler("/Error"); }
+if (!IsDevelopment) {
+    app.UseExceptionHandler("/Error");
+}
 
 app.UseStaticFiles();
 app.UseRouting();
@@ -66,14 +68,13 @@ string SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
 var jOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = false };
 
 if (SqlLoggingEnabled) {
-    SqlTableCreate(SqlTable, SqlConnectionString);
+    SqlTableCreate(SqlConnectionString, SqlTable);
 }
 
 ScriptLoader();
 
 app.Map("/check", async (HttpContext Context) =>
     {
-
         bool success = true;
         string ErrorMessage = "";
         try {
@@ -187,7 +188,6 @@ app.Map($"/{PwShUrl}/{{Wrapper}}", async (string Wrapper, HttpContext Context) =
 app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Script, HttpContext Context) =>
     {
         Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
-
         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
         bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
         bool WrapperPermission = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
@@ -200,14 +200,15 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Scri
             ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
             string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
             string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
+            string hostname = Context.Request.Host.ToString();
             if (!ScriptCache.ContainsKey(Wrapper)) {
-                await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Wrapper '{Wrapper}' not found in cache, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all" }, jOptions);
+                await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Wrapper '{Wrapper}' not found in cache, use {hostname}/reload for load new scripts or wrappers and {hostname}/clear for clear all" }, jOptions);
             } else if (!ScriptCache[Wrapper].ContainsKey(Script)) {
-                await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Script '{Script}' not found in cache, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all" }, jOptions);
+                await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Script '{Script}' not found in cache, use {hostname}/reload for load new scripts or wrappers and {hostname}/clear for clear all" }, jOptions);
             } else if (!File.Exists(WrapperFile)) {
-                await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Wrapper '{Wrapper}' not found on disk, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all" }, jOptions);
+                await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Wrapper '{Wrapper}' not found on disk, use {hostname}/reload for load new scripts or wrappers and {hostname}/clear for clear all" }, jOptions);
             } else if (!File.Exists(ScriptFile)) {
-                await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Script '{Script}' not found on disk, use {Context.Request.Host}/reload for load new scripts or wrappers and {Context.Request.Host}/clear for clear all" }, jOptions);
+                await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Script '{Script}' not found on disk, use {hostname}/reload for load new scripts or wrappers and {hostname}/clear for clear all" }, jOptions);
             } else {
                 Console.WriteLine($"DateTime:'{DateTime.Now.ToString(DateTimeLogFormat)}', Path:'{Context.Request.Path}', QueryString:'{Context.Request.QueryString}', UserName:'{Context.User.Identity!.Name}'");
                 var streamReader = new StreamReader(Context.Request.Body, encoding: System.Text.Encoding.UTF8);
@@ -219,40 +220,92 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Scri
     }
 );
 
-// app.Map("/log", async (HttpContext Context) =>
-//     {
-//         Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
+app.Map("/log", async (HttpContext Context) =>
+    {
+        List<Dictionary<string,object>> data = new();
+        string Output = "";
+        bool success = true;
+        string error = "";
+        int Limit = 10;
+        int Order = 1;
+        bool ASC = false;
+        JsonObject.ConvertToJsonContext jsonContext = new JsonObject.ConvertToJsonContext(maxDepth: 4, enumsAsStrings: true, compressOutput: false);
+        Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
 
-//         bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
-//         bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
+        bool UserIsInRoleAdmin = app.Configuration.GetSection("Roles:Admin").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
+        bool UserIsInRoleUser = app.Configuration.GetSection("Roles:User").GetChildren().ToList().Any(x => Context.User.IsInRole($"{x.Value}"));
         
-//         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
-//         SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
-//         SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
-//         List<string> SearchColumns = new() {"id","wrapper","script","ipaddress"};
+        IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
+        SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
+        SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
 
-//         Dictionary<string,object> SearchParams = new();
-//         foreach (var _ in Context.Request.Query) {
-//             if (SearchColumns.Contains(_.Key.ToLower())) {
-//                 SearchParams[_.Key] = _.Value;
-//             }
-//         }
-//         // Context.Request.Query.ToList().Where(x => SearchColumns.Contains(x.Key.ToLower())).ToDictionary(x => $"{x.Key}", x => $"{x.Value}")
-//         string Limit = Context.Request.Query.Where(x => x.Key.ToLower() == "limit").Select(x => x.Key).FirstOrDefault("10");
-//         // int Limit = 10;
-//         // try {
-//         //     Limit = Convert.ToInt32(LimitStr);
-//         // } catch {}
+        List<string> SearchColumns = new() {"id","BeginDate","EndDate","PID","UserName","IPAddress","Method","Wrapper","Script","Headers","Query","Body","Error","Success","HadErrors","PSObjects","StreamError","StreamWarning","StreamInformation","StreamVerbose"};
+        List<string> Operators = new() {"","=","!",">","!>","<","!<","~","!~"};
 
-//         if (!(UserIsInRoleAdmin || UserIsInRoleUser) && !IsDevelopment) {
-//             await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
-//         } else {
-//             var SqlData = SqlHelper(SqlTable,SearchParams,"select",SqlConnectionString);
-//             await Context.Response.WriteAsync("qwe");
-//         }
-//     }
-// );
+        List<List<string>> ValidParamTemplates = SearchColumns.Select(x => Operators.Select(y => $"{x.ToLower()}{y}").ToList()).ToList();
+        Dictionary<string,dynamic> Query = new();
+        foreach (var _ in Context.Request.Query) {Query[_.Key.ToString().ToLower()] = _.Value.ToString();}
+        if (int.TryParse(Query.GetValueOrDefault("$limit","10"), out int Limit_)) {Limit = Limit_;} else {success=false;error="limit is not integer";}
+        if (int.TryParse(Query.GetValueOrDefault("$order","1"), out int Order_)) {Order = Order_;} else {success=false;error="order is not integer";}
+        if (int.TryParse(Query.GetValueOrDefault("$asc","0"), out int ASC_)) {ASC = ASC_ > 0 ? true : false;} else {success=false;error="asc is not integer";}
+        Dictionary<string,dynamic> Filter = Query.Where(x => !x.Key.StartsWith("$") && ValidParamTemplates.Any(y => y.Contains(x.Key))).ToDictionary(x => x.Key, x => x.Value);
+        
+        List<string> DateColumns = Filter.Select(x => x.Key).Where(x => x.StartsWith("begindate") || x.StartsWith("enddate")).ToList();
+        foreach (string DateColumn_ in DateColumns) {
+            
+            DateTime dt = new();
+            if (DateTime.TryParse(Filter[DateColumn_],out dt)) {
+                Filter[DateColumn_] = dt;
+            };
+        }
+        
+        SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
+        if (!SqlLoggingEnabled) {
+            await Context.Response.WriteAsJsonAsync(new {Success=false,Error="sql logging disabled"}, jOptions);
+        } else if (!success) {
+            await Context.Response.WriteAsJsonAsync(new {Success=false,Error=error}, jOptions);
+        } else if (!(UserIsInRoleAdmin || UserIsInRoleUser) && !IsDevelopment) {
+            await Context.Response.WriteAsJsonAsync(new {Success=false,Error="access denied"}, jOptions);
+        } else {
+            try {
+                var rows = SqlSelect(SqlConnectionString,SqlTable,Filter,Order,ASC,Limit);
+                foreach(Dictionary<string,object> row in rows) {
+                    data.Add(
+                        new Dictionary<string,object>() {
+                            ["id"] = row["id"],
+                            ["BeginDate"] = row["BeginDate"],
+                            ["EndDate"] = row["EndDate"],
+                            ["PID"] = row["PID"],
+                            ["UserName"] = row["UserName"],
+                            ["IPAddress"] = row["IPAddress"],
+                            ["Method"] = row["Method"],
+                            ["Wrapper"] = row["Wrapper"],
+                            ["Script"] = row["Script"],
+                            ["Success"] = row["Success"],
+                            ["Error"] = row["Error"],
+                            ["HadErrors"] = row["HadErrors"],
+                            ["Query"] = JsonObject.ConvertFromJson(row["Query"].ToString(), out ErrorRecord query_error),
+                            ["Body"] = JsonObject.ConvertFromJson(row["Body"].ToString(), out ErrorRecord body_error),
+                            ["PSObjects"] = JsonObject.ConvertFromJson(row["PSObjects"].ToString(), out ErrorRecord psobjects_error),
+                            ["StreamError"] = JsonObject.ConvertFromJson(row["StreamError"].ToString(), out ErrorRecord streamerror_error),
+                            ["StreamWarning"] = JsonObject.ConvertFromJson(row["StreamWarning"].ToString(), out ErrorRecord streamwarning_error),
+                            ["StreamInformation"] = JsonObject.ConvertFromJson(row["StreamInformation"].ToString(), out ErrorRecord streaminformation_error),
+                            ["StreamVerbose"] = JsonObject.ConvertFromJson(row["StreamVerbose"].ToString(), out ErrorRecord streamverbose_error),
+                            ["Headers"] = JsonObject.ConvertFromJson(row["Headers"].ToString(), out ErrorRecord headers_error),
+                        }
+                    );
+                }
 
+            } catch (Exception e) {
+                success = false;
+                error = e.Message;
+            }
+            Dictionary<string,object> result = new() {["Success"]=success,["Error"]=error,["Count"]=data.Count,["Data"]=data};
+            Output = ConvertToJson(result);
+            await Context.Response.WriteAsync(Output);
+        }
+    }
+);
 
 string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Context) {
     ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
@@ -276,7 +329,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
     if (h_compress.Length > 0) { if (int.TryParse(Headers[h_compress], out int h_compress_)) { compressOutput = Convert.ToBoolean(h_compress_); }}
 
     var CurrentProcess = Process.GetCurrentProcess();
-    Dictionary<string,object> SqlLogOutput = new();
+    Dictionary<string,object> SqlRecord = new();
     OrderedDictionary ResultTable = new();
     Collection<PSObject> PSObjects = new();
     OrderedDictionary Streams = new();
@@ -299,7 +352,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
 
         if (SqlTable != app.Configuration.GetValue("SqlLogging:Table", "Log")) {
             SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
-            SqlTableCreate(SqlTable, SqlConnectionString);
+            SqlTableCreate(SqlConnectionString, SqlTable);
             Console.WriteLine($"{DateTime.Now.ToString(DateTimeLogFormat)}, SQL TABLE CHANGED!");
         }
 
@@ -320,13 +373,13 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
             SqlLogParam["UserName"] = Context.User.Identity.Name;
         }
         try {
-            SqlLogOutput = SqlHelper(SqlTable,SqlLogParam,"INSERT",SqlConnectionString,PrimaryKey:"id");
+            SqlRecord = SqlInsert(SqlConnectionString,SqlTable,SqlLogParam).First();
         } catch (Exception e) {
             Console.WriteLine(e.ToString());
         }
     }
 
-    if (SqlLoggingEnabled && AbortScriptOnSqlFailure && SqlLogOutput.Count < 1) {
+    if (SqlLoggingEnabled && AbortScriptOnSqlFailure && SqlRecord.Count < 1) {
         success = false;
         error = $"SQL Error";
     } else {
@@ -539,24 +592,26 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
     }
 
 
-    if (SqlLoggingEnabled && SqlLogOutput.Count > 0) {
+    if (SqlLoggingEnabled && SqlRecord.Count > 0) {
 
-        Dictionary<string,object> SqlLogParam = new()
-        {
-            ["id"] = SqlLogOutput["id"],
+        Dictionary<string,object> SqlRecordFilter = new() {
+            ["id"] = SqlRecord["id"],
+        };
+
+        Dictionary<string,object> SqlRecordData = new(){
             ["EndDate"] = DateTime.Now,
             ["Error"] = error,
             ["Success"] = success,
             ["HadErrors"] = HadErrors,
         };
 
-        if (app.Configuration.GetValue("SqlLogging:Fields:PSObjects", true)) {SqlLogParam["PSObjects"] = ConvertToJson(PSObjects,compressOutput:true,RaiseError:false);}
-        if (app.Configuration.GetValue("SqlLogging:Fields:StreamError", true)) {SqlLogParam["StreamError"] = ConvertToJson(ErrorList,compressOutput:true,RaiseError:false);}
-        if (app.Configuration.GetValue("SqlLogging:Fields:StreamWarning", true)) {SqlLogParam["StreamWarning"] = ConvertToJson(WarningList,compressOutput:true,RaiseError:false);}
-        if (app.Configuration.GetValue("SqlLogging:Fields:StreamInformation", true)) {SqlLogParam["StreamInformation"] = ConvertToJson(InformationList,compressOutput:true,RaiseError:false);}
-        if (app.Configuration.GetValue("SqlLogging:Fields:StreamVerbose", true)) {SqlLogParam["StreamVerbose"] = ConvertToJson(VerboseList,compressOutput:true,RaiseError:false);}
+        if (app.Configuration.GetValue("SqlLogging:Fields:PSObjects", true)) {SqlRecordData["PSObjects"] = ConvertToJson(PSObjects,compressOutput:true,RaiseError:false);}
+        if (app.Configuration.GetValue("SqlLogging:Fields:StreamError", true)) {SqlRecordData["StreamError"] = ConvertToJson(ErrorList,compressOutput:true,RaiseError:false);}
+        if (app.Configuration.GetValue("SqlLogging:Fields:StreamWarning", true)) {SqlRecordData["StreamWarning"] = ConvertToJson(WarningList,compressOutput:true,RaiseError:false);}
+        if (app.Configuration.GetValue("SqlLogging:Fields:StreamInformation", true)) {SqlRecordData["StreamInformation"] = ConvertToJson(InformationList,compressOutput:true,RaiseError:false);}
+        if (app.Configuration.GetValue("SqlLogging:Fields:StreamVerbose", true)) {SqlRecordData["StreamVerbose"] = ConvertToJson(VerboseList,compressOutput:true,RaiseError:false);}
 
-        SqlHelper(SqlTable,SqlLogParam,"UPDATE",SqlConnectionString,PrimaryKey:"id");
+        SqlUpdate(SqlConnectionString,SqlTable,SqlRecordData,SqlRecordFilter);
     }
     GC.Collect();
     
@@ -579,8 +634,19 @@ string ConvertToJson(object data, int maxDepth = 4, bool enumsAsStrings = true, 
     return Result;
 }
 
-void SqlTableCreate(string SqlTable, string ConnectionString) {
-    string SqlQuery = $"IF OBJECT_ID(N'[{SqlTable}]') IS NULL CREATE TABLE {SqlTable} ( [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED, [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [PID] int NULL, [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [Method] [nvarchar](16) NULL, [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Headers] [text] NULL, [Query] [text] NULL, [Body] [text] NULL, [Error] [text] NULL, [Success] [bit] NULL, [HadErrors] [bit] NULL, [PSObjects] [text] NULL, [StreamError] [text] NULL, [StreamWarning] [text] NULL, [StreamInformation] [text] NULL, [StreamVerbose] [text] NULL )";
+void SqlTableCreate(string ConnectionString, string Table) {
+    string SqlQuery = $@"
+        IF OBJECT_ID(N'[{Table}]') IS NULL
+        CREATE TABLE {Table} (
+            [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED,
+            [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [PID] int NULL,
+            [UserName] [nvarchar](64) NULL DEFAULT '-', [IPAddress] [nvarchar](64) NULL DEFAULT '-', [Method] [nvarchar](16) NULL DEFAULT '-',
+            [Wrapper] [nvarchar](256) NULL DEFAULT '-', [Script] [nvarchar](256) NULL DEFAULT '-',
+            [Headers] [text] NULL DEFAULT '{{}}', [Query] [text] NULL DEFAULT '{{}}', [Body] [text] NULL DEFAULT '{{}}',
+            [Error] [text] NULL DEFAULT '-', [Success] [bit] NULL DEFAULT 0, [HadErrors] [bit] NULL DEFAULT 1,
+            [PSObjects] [text] NULL DEFAULT '[]', [StreamError] [text] NULL DEFAULT '[]', [StreamWarning] [text] NULL DEFAULT '[]', [StreamInformation] [text] NULL DEFAULT '[]', [StreamVerbose] [text] NULL DEFAULT '[]'
+        )
+    ";
     var connection = new System.Data.SqlClient.SqlConnection(SqlConnectionString);
     var command = new System.Data.SqlClient.SqlCommand(SqlQuery, connection);
     System.Data.SqlClient.SqlDataAdapter adapter = new();
@@ -589,41 +655,141 @@ void SqlTableCreate(string SqlTable, string ConnectionString) {
     adapter.Fill(DataSet);
 }
 
-Dictionary<string,object> SqlHelper(string SqlTable, Dictionary<string,object> Params, string Operation, string ConnectionString, string PrimaryKey = "id") {
-    Dictionary<string,object> result = new();
-    List<string> Keys = Params.Select(x => x.Key).Where(x => x != PrimaryKey).ToList();
-    string Query = "";
-    switch (Operation.ToUpper())
-    {
-        case "SELECT":
-            Query = $"SELECT * FROM [{SqlTable.Trim('[',']')}] WHERE 1=1 {String.Join(' ',Params.Keys.Select(x => $" AND [{x}] = @{x}"))}";
-            break;
-        case "INSERT":
-            Query = $"INSERT INTO [{SqlTable.Trim('[',']')}] ({String.Join(',',Keys.Select(x => $"[{x}]"))}) OUTPUT INSERTED.* VALUES({String.Join(',',Keys.Select(x => $"@{x}"))})";
-            break;
-        case "UPDATE":
-            if (!Params.ContainsKey(PrimaryKey)) {new Exception($"Params not contains the specified PrimaryKey: '{PrimaryKey}'");}
-            Query = $"UPDATE [{SqlTable.Trim('[',']')}] SET {String.Join(',',Keys.Select(x => $"[{x}]=@{x}"))} OUTPUT INSERTED.* WHERE [{PrimaryKey.Trim('[',']')}] = @{PrimaryKey}";
-            break;
-    }
-
+List<Dictionary<string,object>> SqlInsert(string ConnectionString, string Table, Dictionary<string,dynamic> Data) {
+    List<Dictionary<string,object>> result = new();
+    string Query = $@"
+        INSERT INTO [{Table.Trim('[',']')}]
+        ({String.Join(',',Data.Keys.Select(x => $"[{x}]"))})
+        OUTPUT INSERTED.*
+        VALUES({String.Join(',',Data.Keys.Select(x => $"@data_{x}"))})
+    ";
     var connection = new System.Data.SqlClient.SqlConnection(ConnectionString);
     var command = new System.Data.SqlClient.SqlCommand(Query, connection);
-    foreach (string Key in Keys) {
-        command.Parameters.AddWithValue(Key,Params[Key]);
-    }
-
-    if (Params.ContainsKey(PrimaryKey)) {command.Parameters.AddWithValue(PrimaryKey,Params[PrimaryKey]);}
-
+    foreach (string Key in Data.Keys) {command.Parameters.AddWithValue($"data_{Key}",Data[Key]);}
+    System.Data.DataTable dt = new();
     System.Data.SqlClient.SqlDataAdapter adapter = new();
     adapter.SelectCommand = command;
-    System.Data.DataSet DataSet = new();
-    adapter.Fill(DataSet);
-    if (!DataSet.HasErrors) {
-        var Table = DataSet.Tables[0];
-        var Columns = Table.Columns;
-        var Row = Table.Rows[0];
-        result = System.Linq.Enumerable.Range(0,Columns.Count).ToDictionary(x => Columns[x].ColumnName, x => Row[x]);
+    adapter.Fill(dt);
+    if (!dt.HasErrors) {
+        List<string> cols = new();
+        foreach(DataColumn col in dt.Columns) {cols.Add(col.ColumnName);}
+        foreach(DataRow row in dt.Rows) {result.Add(cols.ToDictionary(x => x, x => row[x]));}
+    }
+    return result;
+}
+
+List<Dictionary<string,object>> SqlUpdate(string ConnectionString, string Table, Dictionary<string,dynamic> Data, Dictionary<string,dynamic> Filter, int RowCount = 0) {
+    List<Dictionary<string,object>> result = new();
+    Dictionary<string,string> Operators = new() {
+        ["="] = "=", ["!"] = "!=",
+        [">"] = ">=", ["!>"] = "<",
+        ["<"] = "<=", ["!<"] = ">",
+        ["~"] = "LIKE", ["!~"] = "NOT LIKE",
+        ["@"] = "IN", ["!@"] = "NOT IN",
+    };
+    List<Dictionary<string,object>> Values = Data
+        .Select((x,i) => new Dictionary<string,object>() {["index"]=i+1,["key"]=x.Key,["value"]=x.Value})
+        .Select(x => new Dictionary<string,object>() {["column"]=$"{x["key"]}",["variable"]=$"@data_{x["key"]}_{x["index"]}",["value"]=x["value"]}).ToList();
+    List<Dictionary<string,object>> FilterIter = Filter.Select((x,i) => new Dictionary<string,object>() {["index"]=i+1,["key"]=x.Key,["value"]=x.Value}).ToList();
+    List<Dictionary<string,object>> Filters = new();
+    foreach(var Filter_ in FilterIter) {
+        object index = Filter_["index"];
+        object value = Filter_["value"];
+        object key_raw = Filter_["key"];
+        string key_op = Operators.Keys.Where(x => key_raw.ToString()!.EndsWith(x)).LastOrDefault("=").ToString();
+        string op = Operators.GetValueOrDefault(key_op,"=");
+        string key_name = key_raw.ToString()!.Replace(key_op,"");
+        if (value.ToString()!.Contains("*") && key_op.EndsWith("~")) {value = value.ToString()!.Replace("*","%");}
+        Filters.Add(
+            new Dictionary<string,object>(){
+                ["column"] = key_name,
+                ["operator"] = op,
+                ["variable"] = $"@filter_{key_name}_{index}",
+                ["value"] = value,
+            }
+        );
+    }
+
+    string Query = $@"
+        SET ROWCOUNT {RowCount};
+        UPDATE [{Table.Trim('[',']')}]
+        SET {String.Join(',',Values.Select(x => $"[{x["column"]}]={x["variable"]}"))}
+        OUTPUT INSERTED.*
+        WHERE 1=1 {String.Join(' ',Filters.Select(x => $"AND [{x["column"]}] {x["operator"]} {x["variable"]}"))}
+    ";
+    
+    var connection = new System.Data.SqlClient.SqlConnection(ConnectionString);
+    var command = new System.Data.SqlClient.SqlCommand(Query, connection);
+    foreach (Dictionary<string,object> Value_ in Values) {
+        command.Parameters.AddWithValue(Value_["variable"].ToString(),Value_["value"]);
+    }
+    foreach (Dictionary<string,object> Filter_ in Filters) {
+        command.Parameters.AddWithValue(Filter_["variable"].ToString(),Filter_["value"]);
+    }
+    System.Data.DataTable dt = new();
+    System.Data.SqlClient.SqlDataAdapter adapter = new();
+    adapter.SelectCommand = command;
+    adapter.Fill(dt);
+    if (!dt.HasErrors) {
+        List<string> cols = new();
+        foreach(DataColumn col in dt.Columns) {cols.Add(col.ColumnName);}
+        foreach(DataRow row in dt.Rows) {result.Add(cols.ToDictionary(x => x, x => row[x]));}
+    }
+    return result;
+}
+
+List<Dictionary<string,object>> SqlSelect(string ConnectionString, string Table, Dictionary<string,dynamic> Filter, int Order = 1, bool ASC = false, int RowCount = 0) {
+    List<Dictionary<string,object>> result = new();
+    string OrderDirection = "";
+    if (ASC) {OrderDirection = "ASC";} else {OrderDirection = "DESC";}
+    Dictionary<string,string> Operators = new() {
+        ["="] = "=", ["!"] = "!=",
+        [">"] = ">=", ["!>"] = "<",
+        ["<"] = "<=", ["!<"] = ">",
+        ["~"] = "LIKE", ["!~"] = "NOT LIKE",
+        ["@"] = "IN", ["!@"] = "NOT IN",
+        ["^"] = "IS", ["!^"] = "IS NOT",
+    };
+    List<Dictionary<string,object>> FilterIter = Filter.Select((x,i) => new Dictionary<string,object>() {["index"]=i+1,["key"]=x.Key,["value"]=x.Value}).ToList();
+    List<Dictionary<string,object>> Filters = new();
+    foreach(var Filter_ in FilterIter) {
+        object index = Filter_["index"];
+        object value = Filter_["value"];
+        object key_raw = Filter_["key"];
+        string key_op = Operators.Keys.Where(x => key_raw.ToString()!.EndsWith(x)).LastOrDefault("=").ToString();
+        string op = Operators.GetValueOrDefault(key_op,"=");
+        string key_name = key_raw.ToString()!.Replace(key_op,"");
+        if (value.ToString()!.Contains("*") && key_op.EndsWith("~")) {value = value.ToString()!.Replace("*","%");}
+        Filters.Add(
+            new Dictionary<string,object>(){
+                ["column"] = key_name,
+                ["operator"] = op,
+                ["variable"] = $"@filter_{key_name}_{index}",
+                ["value"] = value,
+            }
+        );
+    }
+    
+    string Query = $@"
+        SET ROWCOUNT {RowCount};
+        SELECT * FROM [{Table.Trim('[',']')}]
+        WHERE 1=1 {String.Join(' ',Filters.Select(x => $"AND [{x["column"]}] {x["operator"]} {x["variable"]}"))}
+        ORDER BY {Order} {OrderDirection}
+    ";
+    
+    var connection = new System.Data.SqlClient.SqlConnection(ConnectionString);
+    var command = new System.Data.SqlClient.SqlCommand(Query, connection);
+    foreach (Dictionary<string,object> Filter_ in Filters) {
+        command.Parameters.AddWithValue(Filter_["variable"].ToString(),Filter_["value"]);
+    }
+    System.Data.DataTable dt = new();
+    System.Data.SqlClient.SqlDataAdapter adapter = new();
+    adapter.SelectCommand = command;
+    adapter.Fill(dt);
+    if (!dt.HasErrors) {
+        List<string> cols = new();
+        foreach(DataColumn col in dt.Columns) {cols.Add(col.ColumnName);}
+        foreach(DataRow row in dt.Rows) {result.Add(cols.ToDictionary(x => x, x => row[x]));}
     }
     return result;
 }

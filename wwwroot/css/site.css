@@ -30,6 +30,7 @@ input, select, button, span {
   z-index:1;
   padding: 25px;
 }
+
 #RIGHT {
   z-index:1000;
   padding: 25px;
@@ -65,8 +66,8 @@ input, select, button, span {
 
 ._btn_copy {
   position: absolute; 
-  top: 10px; 
-  right: 10px;
+  top: 15px; 
+  right: 25px;
 }
 
 #_result {
@@ -77,6 +78,22 @@ input, select, button, span {
   overflow: auto;
 }
 
-#_result.processing {
-  /* background: linear-gradient(to bottom right, blue, pink) !important; */
+.modal-body {
+  border-radius: 5px;
+  border-collapse: collapse;
+}
+
+.modal-body tr {
+  border: 1px solid #ddd;
+  padding: 2px 5px;
+  border-radius: 5px;
+  border-collapse: collapse;
+}
+
+.modal-body tr:nth-child(2n) { /* чётные */
+  background: #eee;
+}
+
+.modal-body table table:first-child tr>td:first-child {
+  font-weight: bold;
 }

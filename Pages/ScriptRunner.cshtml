@@ -16,88 +16,89 @@
     <div class="text-center"><h3>У вас нет прав на просмотр этой страницы</h3></div>
 } else {
     if (@Model.IsDevelopment) {
-        <h3 style="color:red;">Включен режим разработки, права пользователей не учитываются!</h3>
+        <div class="text-center text-danger"><h3>Включен режим разработки, права пользователей не учитываются!</h3></div>
     }
 
-    <div id="Param" class="input-group" style="display:none">
-        <select style="max-width:90px" name="Type" class="form-select param_prop">
+    <div id="Param" class="input-group input-group-sm" style="display:none">
+        <select name="Type" class="form-select w-25 param_prop">
             <option value="String">String</option>
             <option value="Number">Number</option>
             <option value="Bool">Bool</option>
             <option value="Object">Object</option>
         </select>
-        <input name="Property" type="text" aria-label="Name" placeholder="Name" class="form-control param_prop">
-        <input name="Value" type="text" aria-label="Value" placeholder="Value" class="form-control param_prop">
+        <input name="Property" type="text" aria-label="Name" placeholder="Name" class="form-control w-25 param_prop">
+        <input name="Value" type="text" aria-label="Value" placeholder="Value" class="form-control w-25 param_prop">
         <button class="btn btn-outline-dark _btn_toggle_param" type="button"><i class="bi-toggle-on"></i></button>
         <button class="btn btn-outline-dark _btn_del_param" type="button"><i class="bi-trash3"></i></button>
     </div>
 
-    <div class="container">
-        <div class="row row-cols-2">
-            <!-- LEFT -->
-            <div id="LEFT" class="col-sm-5 col-md-4 col-xs-4" style="z-index:2">
-                <div class="mb-3">
-                    <form>
-                        <label for="_wrapper" class="form-label">Wrapper</label>
-                        <select id="_wrapper" name="_wrapper" class="form-select"></select>
+    <div class="row row-cols-2">
+        <!-- LEFT -->
+        <div id="LEFT" class="col-xs-12 col-sm-12 col-md-8 col-lg-4 col-xl-4 col-xxl-4" style="z-index:2">
+            <form>
+                <div class="input-group input-group-sm w-100">
+                    <label for="_wrapper" class="form-label w-25">Wrapper</label>
+                    <select id="_wrapper" name="_wrapper" class="form-select w-75"></select>
 
-                        <label for="_script" class="form-label">Script</label>
-                        <select id="_script" name="_script" class="form-select" disabled></select>
-                    </form>
+                    <label for="_script" class="form-label w-25">Script</label>
+                    <select id="_script" name="_script" class="form-select w-75" disabled></select>
                 </div>
-                @if (@Model.UserIsInRoleAdmin || @Model.IsDevelopment)
-                {
-                    <div class="mb-3">
-                        <button type="button" class="_btn_reload btn btn-dark btn-outline-success" style="width:49%">Reload Cache</button>
-                        <button type="button" class="_btn_clear btn btn-dark btn-outline-danger" style="width:49%">Clear Cache</button>
-                    </div>
-                }
-                <div class="mb-3">
-                    <span>Params</span>
-                    <button type="button" class="_btn_add_param btn btn-outline-dark" style="width:100%">Add</button>
+            </form>
+            <br>
+            @if (@Model.UserIsInRoleAdmin || @Model.IsDevelopment)
+            {
+                <div class="input-group input-group-sm w-100">
+                    <button type="button" class="_btn_reload btn btn-dark btn-outline-success w-50" >Reload Cache</button>
+                    <button type="button" class="_btn_clear btn btn-dark btn-outline-danger w-50" >Clear Cache</button>
                 </div>
-
-                <div id="Params"></div>
-            </div>
-            <!-- RIGHT -->
-            <div id="RIGHT" class="col-sm-5 offset-sm-2 col-md-8 offset-md-0 col-xs-8 border border-2" style="z-index:1">
-                <div class="mb-3">
-                    <label for="_body" class="form-label">Body</label>
-                    <input id="_body" class="form-control bg-dark text-light" placeholder="Body">
-                    <a id="pwsh_url" target="_blank" href="/PowerShell/"></a>
-                </div>
-                <div class="mb-3">
-
-                    <div id="SendParam" class="input-group">
-                        <span class="input-group-text">maxDepth</span>
-                        <input name="maxDepth" type="number" min="1" max="10" aria-label="Depth" placeholder="maxDepth" value="4" class="form-control _depth">
-
-                        <span class="input-group-text ">OutputType</span>
-                        <select name="OutputType" class="form-select _outputtype">
-                            <option value="Raw">Raw</option>
-                            <option value="Streams">Streams</option>
-                            <option value="PSObjects">PSObjects</option>
-                            <option value="Error">Error</option>
-                            <option value="Warning">Warning</option>
-                            <option value="Verbose">Verbose</option>
-                            <option value="Information">Information</option>
-                            <option value="Debug">Debug</option>
-                        </select>
-                        <button class="btn btn-outline-dark _btn_send" method="GET" type="button">GET</button>
-                        <button class="btn btn-outline-dark _btn_send" method="POST" type="button">POST</button>
-                    </div>
-
-                        <br>
-                    <label for="_result" class="form-label">Result</label>
-                    <div id="Result" class="mb-3">
-                        <textarea id="_result" class="form-control bg-dark text-light border border-4 rounded rounded-5" rows="20" placeholder="Result" readonly></textarea>
-                        <span class="btn btn-outline-light _btn_copy"><i class="bi bi-clipboard"></i></span>
-                    </div>
-                </div>
+            }
+            <br>
+            <div class="input-group input-group-sm w-100">
+                <span>Params</span>
+                <button type="button" class="_btn_add_param btn btn-outline-dark w-100">Add</button>
             </div>
 
+            <div id="Params"></div>
         </div>
+        <!-- RIGHT -->
+        <div id="RIGHT" class="col-xs-12 col-sm-12 col-md-8 col-lg-8 col-xl-8 col-xxl-8" style="z-index:1">
+            <div class="">
+                <label for="_body" class="form-label">Body</label>
+                <input id="_body" class="form-control bg-dark text-light" placeholder="Body">
+                <a id="pwsh_url" target="_blank" href="/@Model.PwShUrl/"></a>
+            </div>
+            <div class="">
+
+                <div id="SendParam" class="input-group input-group-sm">
+                    <span class="input-group-text">maxDepth</span>
+                    <input name="maxDepth" type="number" min="1" max="10" aria-label="Depth" placeholder="maxDepth" value="4" class="form-control _depth">
+
+                    <span class="input-group-text ">OutputType</span>
+                    <select name="OutputType" class="form-select _outputtype">
+                        <option value="Raw">Raw</option>
+                        <option value="Streams">Streams</option>
+                        <option value="PSObjects">PSObjects</option>
+                        <option value="Error">Error</option>
+                        <option value="Warning">Warning</option>
+                        <option value="Verbose">Verbose</option>
+                        <option value="Information">Information</option>
+                        <option value="Debug">Debug</option>
+                    </select>
+                    <button class="btn btn-outline-dark _btn_send" method="GET" type="button">GET</button>
+                    <button class="btn btn-outline-dark _btn_send" method="POST" type="button">POST</button>
+                </div>
+
+                    <br>
+                <label for="_result" class="form-label">Result</label>
+                <div id="Result" class="">
+                    <textarea id="_result" class="form-control bg-dark text-light border border-4 rounded rounded-5" rows="20" placeholder="Result" readonly></textarea>
+                    <span class="btn btn-outline-light _btn_copy"><i class="bi bi-clipboard"></i></span>
+                </div>
+            </div>
+        </div>
+
     </div>
+
 }
 
 <script src="~/js/ScriptRunner.js" asp-append-version="true"></script>
