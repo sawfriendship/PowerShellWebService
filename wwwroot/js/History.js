@@ -55,7 +55,14 @@ function load_modal(event_id) {
 }
 
 function load_param() {
-    var form_items = ['_interval','_count','_wrapper','_wrapper_op','_script','_script_op','_begindate1_op','_begindate1','_begindate2_op','_begindate2','_username_op','_username','_ipaddress','_ipaddress_op']
+    var form_items = [
+        '_interval','_count',
+        '_wrapper','_wrapper_op','_script','_script_op',
+        '_begindate1_op','_begindate1','_begindate2_op','_begindate2',
+        '_username_op','_username',
+        '_ipaddress','_ipaddress_op',
+        '_method','_method_op'
+    ]
     
     form_items.forEach(function(item){
         $(`form [name=${item}]`).on('click change keyup', function(e){
@@ -63,6 +70,13 @@ function load_param() {
                 localStorage[item]=$(this).val()
             } else {
                 localStorage.removeItem(item)
+            }
+            if (e.keyCode === 13) {
+                // window.location.reload();
+                min_id = 0;
+                max_id = 0;
+                tbody.html('')
+                load_data(direction=1);
             }
         });
         if (has_key(localStorage,item)) {
@@ -91,6 +105,7 @@ function load_data(direction=0) {
     if (has_key(localStorage,'_begindate2') && localStorage['_begindate2']) {filter[`BeginDate${localStorage['_begindate2_op']}`] = localStorage['_begindate2']}
     if (has_key(localStorage,'_username') && localStorage['_username']) {filter[`UserName${localStorage['_username_op']}`] = localStorage['_username']}
     if (has_key(localStorage,'_ipaddress') && localStorage['_ipaddress']) {filter[`IPAddress${localStorage['_ipaddress_op']}`] = localStorage['_ipaddress']}
+    if (has_key(localStorage,'_method') && localStorage['_method']) {filter[`Method${localStorage['_method_op']}`] = localStorage['_method']}
 
     console.log(filter)
 
