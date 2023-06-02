@@ -88,16 +88,9 @@ function load_param() {
 }
 
 function load_data(direction=0) {
-    var filter_ = {'$limit':10,'$order':1}
     var filter = {}
-    if (direction == 0 || max_id == 0 || min_id == 0) {
-        filter = Object.assign({},filter_,{'$asc':0,'$limit':10})
-    } else if (direction > 0 && max_id != 0 && min_id != 0) {
-        filter = Object.assign({},filter_,{'$asc':1,'id!<':max_id})
-    } else if (direction < 0 && max_id != 0 && min_id != 0) {
-        filter = Object.assign({},filter_,{'$asc':0,'id!>':min_id})
-    } else {}
-
+    var filter_ = {'$limit':10,'$order':1}
+    
     if (has_key(localStorage,'_count') && localStorage['_count']) {filter['$limit'] = localStorage['_count']}
     if (has_key(localStorage,'_wrapper') && localStorage['_wrapper']) {filter[`Wrapper${localStorage['_wrapper_op']}`] = localStorage['_wrapper']}
     if (has_key(localStorage,'_script') && localStorage['_script']) {filter[`Script${localStorage['_script_op']}`] = localStorage['_script']}
@@ -106,8 +99,17 @@ function load_data(direction=0) {
     if (has_key(localStorage,'_username') && localStorage['_username']) {filter[`UserName${localStorage['_username_op']}`] = localStorage['_username']}
     if (has_key(localStorage,'_ipaddress') && localStorage['_ipaddress']) {filter[`IPAddress${localStorage['_ipaddress_op']}`] = localStorage['_ipaddress']}
     if (has_key(localStorage,'_method') && localStorage['_method']) {filter[`Method${localStorage['_method_op']}`] = localStorage['_method']}
-
+    
     console.log(filter)
+    
+    if (direction == 0 || max_id == 0 || min_id == 0) {
+        filter = Object.assign(filter,filter_,{'$asc':0,'$limit':10})
+    } else if (direction > 0 && max_id != 0 && min_id != 0) {
+        filter = Object.assign(filter,filter_,{'$asc':1,'id!<':max_id})
+    } else if (direction < 0 && max_id != 0 && min_id != 0) {
+        filter = Object.assign(filter,filter_,{'$asc':0,'id!>':min_id})
+    } else {}
+
 
     $.ajax({
         url: '/log',
@@ -117,6 +119,9 @@ function load_data(direction=0) {
             var data = responce.Data;
             if (responce.Success && responce.Count > 0) {
                 var row = '';
+                if (max_id == 0 || min_id == 0) {
+                    $('#ParamURL').html($(`<p>URL: <a href="${this.url}" target="_blank">${this.url}</a></p>`))
+                };
                 data.forEach(function(item){
                     var sclass = 'table-light';
                     if (item.HadErrors) {sclass = 'table-warning'}
@@ -144,9 +149,11 @@ function load_data(direction=0) {
         error: function(responce) {
             // console.log('err')
         },
-        // complete: function(){
-        //     $('#ParamURL').html($(`<p>URL: <a href="${this.url}" target="_blank">${this.url}</a></p>`))
-        // },
+        complete: function(){
+            if (max_id == 0 || min_id == 0) {
+                // $('#ParamURL').html($(`<p>URL: <a href="${this.url}" target="_blank">${this.url}</a></p>`))
+            }
+        },
     });
 
 }
@@ -189,8 +196,6 @@ function throttle(callee, timeout) {
         }, timeout)
     }
 }
-
-// https://nikhil-vartak.github.io/json-to-html-converter/
 
 var reload_timer_id = 0;
 
