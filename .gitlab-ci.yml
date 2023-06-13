@@ -12,7 +12,6 @@ deploy_to_repository:
    - (Get-Date).ToString('o')
    - $Location = Get-Location
    - dotnet.exe build
-   - #Import-Module IISAdministration -WarningAction:SilentlyContinue
    - Import-Module WebAdministration -WarningAction:SilentlyContinue
    - Get-WebSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
    - Write-Host $Location -ForegroundColor Yellow
