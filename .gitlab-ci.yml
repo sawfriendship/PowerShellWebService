@@ -12,13 +12,16 @@ deploy_to_repository:
    - (Get-Date).ToString('o')
    - $Location = Get-Location
    - dotnet.exe build
-   - Import-Module IISAdministration -WarningAction:SilentlyContinue
-   - Get-IISSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
+   - #Import-Module IISAdministration -WarningAction:SilentlyContinue
+   - Import-Module WebAdministration -WarningAction:SilentlyContinue
+   - Get-WebSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
    - Write-Host $Location -ForegroundColor Yellow
    - Get-ChildItem -Path $Location -Recurse | % {$_.FullName.replace($Location,'')}
-   - Stop-IISSite -Name 'PowerShellWebService' -Confirm:$false -Passthru | ft Id,Name,State,Bindings
+   - Stop-WebSite -Name 'PowerShellWebService' -Confirm:$false -Passthru | ft Id,Name,State,Bindings
+   - Stop-WebAppPool -Name 'PowerShellWebService' -Confirm:$false -Passthru | ft Name,State,Applications
    - try {Copy-Item -Force -Recurse -Path "$Location\bin\Debug\net7.0-windows\*" -Destination 'C:\inetpub\PowerShellWebService\'} catch {Write-Warning $_.Exception}
-   - Start-IISSite -Name 'PowerShellWebService' -Passthru | ft Id,Name,State,Bindings
+   - Start-WebAppPool -Name 'PowerShellWebService' -Passthru | ft Name,State,Applications
+   - Start-WebSite -Name 'PowerShellWebService' -Passthru | ft Id,Name,State,Bindings
    - (Get-Date).ToString('o')
   tags: 
     - APP

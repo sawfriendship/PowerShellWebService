@@ -1,6 +1,6 @@
 [ordered]@{
-    RemoteIpAddress = [IPAddress]($Context.Connection.RemoteIpAddress.Address)
-    Host = $Context.Request.Host
-    UserName = $Context.User.Identity.Name
-    UserGroups = $Context.User.Identity.Groups
+    RemoteIpAddress = [IPAddress]($__CONTEXT__.Connection.RemoteIpAddress.Address)
+    Host = $__CONTEXT__.Request.Host
+    UserName = $__CONTEXT__.User.Identity.Name
+    UserGroups = $__CONTEXT__.User.Identity.Groups
 }

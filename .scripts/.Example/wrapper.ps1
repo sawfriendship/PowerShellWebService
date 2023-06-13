@@ -1,33 +1,39 @@
 param(
-    [System.String]$ScriptFile,
-    [System.Object]$Query,
-    [System.Object]$Body,
-    [System.Object]$Context
+    [Parameter(Mandatory=$true)][System.String]$__SCRIPTFILE__,
+    [Parameter(Mandatory=$true)][System.String]$__SCRIPTNAME__,
+    [Parameter(Mandatory=$true)][System.String]$__WRAPPER__,
+    [Parameter(Mandatory=$true)][System.Object]$__QUERY__,
+    [Parameter(Mandatory=$true)][System.Object]$__BODY__,
+    [Parameter(Mandatory=$true)][System.String]$__METHOD__,
+    [Parameter(Mandatory=$true)][System.Object]$__USER__,
+    [Parameter(Mandatory=$true)][System.Object]$__CONTEXT__,
+    [Parameter(Mandatory=$false)][System.String]$__CONTENTTYPE__,
+    [Parameter(Mandatory=$false)][System.String]$__TRANSCRIPT_FILE__
 )
 
 # Using checks
 # . $PSScriptRoot\middleware\checks.ps1
 
-if ($Body) {
-	[hashtable]$Params = ConvertFrom-Json -InputObject $Body -AsHashtable   
-} elseif ($Query.Count) {
-    [hashtable]$Params = $Query
-} else {
-    [hashtable]$Params = @{}
+[hashtable]$__PARAMS__ = @{}
+
+$__QUERY__.GetEnumerator() | ForEach-Object {$__PARAMS__[$_.Key] = $_.Value}
+
+if ($__BODY__) {
+    ConvertFrom-Json -InputObject $__BODY__ -AsHashtable | ForEach-Object {$_.GetEnumerator()} | ForEach-Object {$__PARAMS__[$_.Key] = $_.Value}
 }
 
-$RouteValues = $Context.Request.RouteValues | % -Begin {$h=@{}} -Process {$h[$_.Key]=$_.Value} -End {$h}
+# Write-Debug "__WRAPPER__:"
+# Write-Debug "PSBoundParameters: $(ConvertTo-Json $PSBoundParameters)"
+# Write-Debug "__SCRIPT__"
+# Write-Debug "__PARAMS__: $(ConvertTo-Json $__PARAMS__)"
 
-$Wrapper = $RouteValues['Wrapper']
-$Script = $RouteValues['Script']
-
-Start-Transcript -Path "$PSScriptRoot\Transcript\$Script\$((Get-Date).ToString('yyyy-MM-dd'))\$((Get-Date).ToString('yyyy-MM-dd_HH-mm-ss-ffffff')).txt" -Force | Out-Null
+$null = Start-Transcript -Path $__TRANSCRIPT_FILE__ -Force
 
 # Using global var, that configured in CachedVariables section of config.json file
 if (!$Global:StartUp) {$Global:StartUp = Get-Date}
 
-Set-Alias -Name 'Script' -Value $ScriptFile
+Set-Alias -Name '__SCRIPT__' -Value $__SCRIPTFILE__
 
-Script @Params
+__SCRIPT__ @__PARAMS__
 
-Stop-Transcript | Out-Null
+$null = Stop-Transcript

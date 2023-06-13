@@ -1,1 +1,1 @@
-Get-ADUser @Params
+Get-ADUser @__PARAMS__

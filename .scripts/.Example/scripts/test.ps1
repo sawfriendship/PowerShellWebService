@@ -1,6 +1,9 @@
+$User = 1
+Remove-Variable User
 [ordered]@{
     StartUp = $StartUp
     UserCredential = $UserCredential
+    User = $User
     ht = @{
         a = @{
             b = @{

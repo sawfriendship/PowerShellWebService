@@ -10,6 +10,31 @@
     <input name="PwShUrl" value="@Model.PwShUrl">
 </div>
 
+@* <h2>Request Headers</h2><table>
+@foreach (var _ in Request.Headers)
+{
+    <tr><td>@_.Key</td><td>@_.Value</td></tr>
+}
+</table> *@
+
+@* <h2>Request Query</h2><table>
+@foreach (var _ in @Model.Query)
+{
+    <tr><td>@_.Key</td><td>@_.Value</td></tr>
+}
+</table> *@
+
+@* @functions {
+    public void OnGet()
+    {
+        
+    }
+} *@
+
+@* Dictionary<string,string> Query = HttpContext.Request.Query.ToDictionary(x => x.Key.ToString().ToLower(), x => x.Value.ToString()); *@
+
+@* <h1>has_role: @Model.has_role</h1> *@
+
 @if (!@Model.IsAuthenticated && !@Model.IsDevelopment) {
     <div class="text-center"><h3>Вы не авторизованы</h3></div>
 } else if (!(@Model.UserIsInRoleAdmin || @Model.UserIsInRoleUser) && !@Model.IsDevelopment) {

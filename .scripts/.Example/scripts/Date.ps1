@@ -1,1 +1,1 @@
-Get-Date @Params
+Get-Date @__PARAMS__

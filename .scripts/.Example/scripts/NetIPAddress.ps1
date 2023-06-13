@@ -1,1 +1,1 @@
-Get-NetIPAddress @Params | select IPAddress,InterfaceIndex,InterfaceAlias
+Get-NetIPAddress @__CONTEXT__ | select IPAddress,InterfaceIndex,InterfaceAlias

@@ -1,10 +1,12 @@
-.vs
-.vscode
+.scripts/*/Transcript
+appsettings.*.json
 bin
 obj
 logs
-.scripts/*/Transcript
+.vs
+.vscode
 *.bak
 *.zip
 *.dib
 *.ipynb
+.fake
