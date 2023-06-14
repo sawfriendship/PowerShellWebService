@@ -17,9 +17,9 @@ deploy_to_repository:
    - Write-Host $Location -ForegroundColor Yellow
    - Get-ChildItem -Path $Location -Recurse | % {$_.FullName.replace($Location,'')}
    - Stop-WebSite -Name 'PowerShellWebService' -Passthru | ft Id,Name,State,Bindings
-   - Stop-WebAppPool -Name 'PowerShellWebService' -Passthru | ft Name,State,Applications
+   - Stop-WebAppPool -Name 'PowerShellWebService' -Passthru | ft Name,State
    - Copy-Item -Force -Recurse -Path "$Location\bin\Debug\net7.0-windows\*" -Destination 'C:\inetpub\PowerShellWebService\' | Group-Object -Property Directory | Select-Object -Property @{n='Directory';e={$_.Name}},Count
-   - Start-WebAppPool -Name 'PowerShellWebService' -Passthru | ft Name,State,Applications
+   - Start-WebAppPool -Name 'PowerShellWebService' -Passthru | ft Name,State
    - Start-WebSite -Name 'PowerShellWebService' -Passthru | ft Id,Name,State,Bindings
    - (Get-Date).ToString('o')
   tags: 
