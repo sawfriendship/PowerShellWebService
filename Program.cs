@@ -550,6 +550,9 @@ List<Dictionary<string,object>> SqlUpdate(string ConnectionString, string Table,
             if (Filters[index]["operator"].ToString().ToUpper().Contains("LIKE") && Filters[index]["value"].ToString()!.Contains("*")) {
                 Filters[index]["value"] = Filters[index]["value"].ToString()!.Replace("*","%");
             }
+            if (Filters[index].GetValueOrDefault("operator","") is System.Text.Json.JsonElement) {
+                Filters[index]["value"] = Filters[index]["value"].ToString();
+            }
             if (Filters[index]["operator"].ToString().ToUpper().Contains("NULL")) {
                 Filters[index]["value"] = "";
             } else {
@@ -803,7 +806,6 @@ app.Map("/login", async (HttpContext Context) =>
 app.Map("/reload", async (HttpContext Context) =>
     {
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
-        Always200 = app.Configuration.GetValue("Always200", true);
         if (hasRole(Context,"Admin") || IsDevelopment) {
             ScriptLoader();
             await Context.Response.WriteAsJsonAsync(new { Success = true, Error = "" }, jOptions);
@@ -817,7 +819,6 @@ app.Map("/reload", async (HttpContext Context) =>
 app.Map("/clear", async (HttpContext Context) =>
     {
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
-        Always200 = app.Configuration.GetValue("Always200", true);
         if (hasRole(Context,"Admin") || IsDevelopment) {
             ClearCache();
             await Context.Response.WriteAsJsonAsync(new { Success = true, Error = "" }, jOptions);
@@ -833,7 +834,6 @@ app.Map($"/{PwShUrl}/", async (HttpContext Context) =>
         bool UserIsInRoleAdmin = hasRole(Context);
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
         Console.WriteLine($"DateTime:'{DateTime.Now.ToString(DateTimeLogFormat)}', Path:'{Context.Request.Path}', QueryString:'{Context.Request.QueryString}', UserName:'{Context.User.Identity!.Name}'");
-        Always200 = app.Configuration.GetValue("Always200", true);
         System.Text.RegularExpressions.Regex regex = new Regex(@"^[a-z0-9]", RegexOptions.IgnoreCase);
 
         if (UserIsInRoleAdmin || IsDevelopment) {
@@ -850,7 +850,6 @@ app.Map($"/{PwShUrl}/{{Wrapper}}", async (string Wrapper, HttpContext Context) =
     {
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
         Console.WriteLine($"DateTime:'{DateTime.Now.ToString(DateTimeLogFormat)}', Path:'{Context.Request.Path}', QueryString:'{Context.Request.QueryString}', UserName:'{Context.User.Identity!.Name}'");
-        Always200 = app.Configuration.GetValue("Always200", true);
         if (hasRole(Context) || IsDevelopment) {
             List<string> Scripts = new();
             if (ScriptCache.ContainsKey(Wrapper)) {
@@ -869,7 +868,6 @@ app.Map($"/{PwShUrl}/{{Wrapper}}", async (string Wrapper, HttpContext Context) =
 app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Script, HttpContext Context) =>
     {
         Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
-        Always200 = app.Configuration.GetValue("Always200", true);
         bool WrapperPermission = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().Any(x => Context.User.IsInRole($"{x.Value}"));
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
         if (!WrapperPermission && !IsDevelopment) {
