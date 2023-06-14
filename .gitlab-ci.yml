@@ -16,7 +16,7 @@ deploy_to_repository:
    - Get-WebSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
    - Write-Host $Location -ForegroundColor Yellow
    - $null = 'Get-ChildItem -Path $Location -Recurse | % {$_.FullName.replace($Location,'')}'
-   - Get-ChildItem -Path $Location -Recurse | Group-Object -Property Directory | Select-Object -Property @{n='Directory';e={$_.Name}},Count
+   - Get-ChildItem -Path $Location -Recurse | Group-Object -Property Directory | Select-Object -Property @{n='Directory';e={$_.Name.replace($Location,'')}},Count
    - Stop-WebSite -Name 'PowerShellWebService' -Passthru | ft Id,Name,State,Bindings
    - Stop-WebAppPool -Name 'PowerShellWebService' -Passthru | ft Name,State
    - try {Copy-Item -Force -Recurse -Path "$Location\bin\Debug\net7.0-windows\*" -Destination 'C:\inetpub\PowerShellWebService\'} catch {Write-Warning $_.Exception}
