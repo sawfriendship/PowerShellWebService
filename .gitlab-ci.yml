@@ -15,7 +15,7 @@ deploy_to_repository:
    - Import-Module WebAdministration -WarningAction:SilentlyContinue
    - Get-WebSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
    - Write-Host $Location -ForegroundColor Yellow
-   - # Get-ChildItem -Path $Location -Recurse | % {$_.FullName.replace($Location,'')}
+   - $null = 'Get-ChildItem -Path $Location -Recurse | % {$_.FullName.replace($Location,'')}'
    - Get-ChildItem -Path $Location -Recurse | Group-Object -Property Directory | Select-Object -Property @{n='Directory';e={$_.Name}},Count
    - Stop-WebSite -Name 'PowerShellWebService' -Passthru | ft Id,Name,State,Bindings
    - Stop-WebAppPool -Name 'PowerShellWebService' -Passthru | ft Name,State
