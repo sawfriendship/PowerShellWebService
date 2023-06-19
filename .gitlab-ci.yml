@@ -20,7 +20,6 @@ deploy_to_repository:
    - Stop-WebSite -Name 'PowerShellWebService' -Passthru | ft Id,Name,State,Bindings
    - Stop-WebAppPool -Name 'PowerShellWebService' -Passthru | ft Name,State
    - try {Copy-Item -Force -Recurse -Path "$Location\bin\Debug\net7.0-windows\*" -Destination 'C:\inetpub\PowerShellWebService\' -Exclude 'appsettings.json'} catch {Write-Warning $_.Exception}
-   - Copy-Item -Force -Path "$Location\bin\Debug\net7.0-windows\appsettings.Production.json" -Destination "C:\inetpub\PowerShellWebService\appsettings.json"
    - Start-WebAppPool -Name 'PowerShellWebService' -Passthru | ft Name,State
    - Start-WebSite -Name 'PowerShellWebService' -Passthru | ft Id,Name,State,Bindings
    - (Get-Date).ToString('o')
