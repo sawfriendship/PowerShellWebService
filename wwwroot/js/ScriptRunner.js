@@ -1,11 +1,6 @@
 ﻿// Please see documentation at https://docs.microsoft.com/aspnet/core/client-side/bundling-and-minification
 // for details on configuring this project to bundle and minify static web assets.
 
-function has_key(obj,key){
-    for (k in obj) {if(k==key){return true}}
-    return false
-}
-
 function load_wrapper_form() {
     var PwShUrl = $('#conf input[name=PwShUrl]').val();
     $('#_wrapper').html($(`<option value="">---</option>`));
@@ -18,7 +13,7 @@ function load_wrapper_form() {
 			if (responce.Success) {
 				var data = responce.Data
 				for (var k in data) {$(`<option value="${k}">${k}</option>`).appendTo('#_wrapper')}
-				if (has_key(localStorage,'wrapper')) {
+				if ('wrapper' in localStorage) {
 					var wrapper = localStorage['wrapper']
 					if (wrapper) {
 						$('#_wrapper').val(wrapper)
@@ -27,7 +22,7 @@ function load_wrapper_form() {
 
 					load_script_form(wrapper);
 
-					if (has_key(localStorage,'script')) {
+					if ('script' in localStorage) {
 						var script = localStorage['script']
 						$('#_script').val(script)
 					}
@@ -55,7 +50,7 @@ function load_script_form(wrapper) {
 				if (responce.Success) {
 					var data = responce.Data
 					for (var k in data) {$(`<option value="${data[k]}">${data[k]}</option>`).appendTo('#_script')}
-					if (has_key(localStorage,'script')) {
+					if ('script' in localStorage) {
 						var script = localStorage['script']
 						$('#_script').val(script)
 					}
@@ -72,7 +67,7 @@ function load_script_form(wrapper) {
         $('#_script').prop('disabled', true)
     }
         
-    if (has_key(localStorage,'script')) {$('#_script').val(localStorage['script'])}
+    if ('script' in localStorage) {$('#_script').val(localStorage['script'])}
 }
 
 function ani_send(d) {

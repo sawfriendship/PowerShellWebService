@@ -90,10 +90,19 @@ input, select, button, span {
   border-collapse: collapse;
 }
 
-.modal-body tr:nth-child(2n) { /* чётные */
-  background: #eee;
+.modal-body table {
+  background-color: #eee;
+}
+
+.modal-body table tr:nth-child(2n) { /* чётные */
+  background-color: #ddd;
 }
 
 .modal-body table table:first-child tr>td:first-child {
   font-weight: bold;
 }
+
+.modal-body td {
+  border-radius: 5px;
+}
+

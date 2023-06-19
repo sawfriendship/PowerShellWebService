@@ -1,49 +1,75 @@
 ﻿@page
 @model HistoryModel
+@using System.Linq
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
 
 @{
     ViewData["Title"] = "History";
-}
-@* <h1>@ViewData["Title"]</h1> *@
+    bool IsDevelopment = Configuration.GetValue("IsDevelopment",false);
+    string PwShUrl = Configuration.GetValue("PwShUrl","api")!;
+    bool IsAuthenticated = HttpContext.User.Identity.IsAuthenticated;
+    bool SqlLoggingEnabled = Configuration.GetValue("SqlLogging:Enabled", false);
+    string UserName = HttpContext.User.Identity!.Name ?? "%UserName%";
+    bool UserIsInRoleAdmin = hasRole(HttpContext,"Admin");
+    bool UserIsInRoleUser = hasRole(HttpContext,"User");
+    // var UserRoles = getRoles(@Request.HttpContext);
+    var Query = Request.Query.ToDictionary(x => x.Key.ToString().ToLower(), x => x.Value.ToString());
 
-<div id="conf" style="display:none;">
-    <input name="PwShUrl" value="@Model.PwShUrl">
-</div>
 
-@* <h2>Request Headers</h2><table>
-@foreach (var _ in Request.Headers)
-{
-    <tr><td>@_.Key</td><td>@_.Value</td></tr>
+    int _interval = 25;
+    string _interval_str = Query.GetValueOrDefault("interval","25");
+    if (int.TryParse(_interval_str, out int _interval_int)) {_interval = _interval_int;}
+    if (_interval < 1) {_interval = 1;}
+
+    int _count = 25;
+    string _count_str = Query.GetValueOrDefault("count","25");
+    if (int.TryParse(_count_str, out int _count_int)) {_count = _count_int;}
+    if (_count < 1) {_count = 1;}
+
 }
-</table> *@
+
+@functions {
+    public bool hasRole(HttpContext Context, string Role = "") {
+        List<IConfigurationSection> Roles = Configuration.GetSection("Roles").GetChildren().Where(x => Role.Length == 0 || x.Key.ToLower() == Role.ToLower()).ToList();
+        foreach (IConfigurationSection Role_ in Roles) {
+            if (Configuration.GetSection(Role_.Path).GetChildren().Any(x => Context.User.IsInRole($"{x.Value}"))) {
+                return true;
+            };
+        }
+        return false;
+    }
+    public List<string> getRoles(HttpContext Context) {
+        List<IConfigurationSection> Roles = Configuration.GetSection("Roles").GetChildren().ToList();
+        List<string> Result = new();
+        foreach (IConfigurationSection Role_ in Roles) {
+            if (Configuration.GetSection(Role_.Path).GetChildren().Any(x => Context.User.IsInRole($"{x.Value}"))) {
+                Result.Add(Role_.Key);
+            };
+        }
+        return Result;
+    }
+}
+
+<div id="conf" style="display:none;"><input name="PwShUrl" value="@PwShUrl"></div>
 
 @* <h2>Request Query</h2><table>
-@foreach (var _ in @Model.Query)
+@foreach (var _ in @Query)
 {
     <tr><td>@_.Key</td><td>@_.Value</td></tr>
 }
 </table> *@
 
-@* @functions {
-    public void OnGet()
-    {
-        
-    }
-} *@
 
-@* Dictionary<string,string> Query = HttpContext.Request.Query.ToDictionary(x => x.Key.ToString().ToLower(), x => x.Value.ToString()); *@
-
-@* <h1>has_role: @Model.has_role</h1> *@
-
-@if (!@Model.IsAuthenticated && !@Model.IsDevelopment) {
+@if (!IsAuthenticated && !IsDevelopment) {
     <div class="text-center"><h3>Вы не авторизованы</h3></div>
-} else if (!(@Model.UserIsInRoleAdmin || @Model.UserIsInRoleUser) && !@Model.IsDevelopment) {
+} else if (!hasRole(HttpContext) && !IsDevelopment) {
     <div class="text-center"><h3>У вас нет прав на просмотр этой страницы</h3></div>
 } else {
-    if (@Model.IsDevelopment) {
+    if (IsDevelopment) {
         <div class="text-center text-danger"><h3>Включен режим разработки, права пользователей не учитываются!</h3></div>
     }
-    if (!@Model.SqlLoggingEnabled) {
+    if (!SqlLoggingEnabled) {
         <div class="text-center"><h3>Чтение журнала возможно только при ведении SQL-лога</h3></div>
     } else {
         <div class="row row-cols-2 content">
@@ -52,14 +78,17 @@
             <div id="Param" class="col-xs-12 col-sm-12 col-md-8 col-lg-8 col-xl-4 col-xxl-4">
                 <form>
                     <div class="input-group input-group-sm w-100">
-
                         <label for="_load_param" class="form-label w-25">Load Param</label>
                         <div id="_load_param" class="input-group input-group-sm w-75">
                             <span class="input-group-text">interval</span>
-                            <input name="_interval" type="number" min="1" max="3600" aria-label="interval" class="form-control" value="5">
+                            <input name="_interval" type="number" min="1" max="3600" aria-label="interval" class="form-control" value="@_interval">
                             <span class="input-group-text">count</span>
-                            <input name="_count" type="number" min="1" max="1000" aria-label="count" class="form-control" value="10">
+                            <input name="_count" type="number" min="1" max="1000" aria-label="count" class="form-control" value="@_count">
                         </div>
+                    </div>
+
+                    <div id="_filters" class="input-group input-group-sm w-100">
+
 
                         <label for="_wrapper" class="form-label w-25">Wrapper</label>
                         <div id="_wrapper" class="input-group input-group-sm w-75">

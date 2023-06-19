@@ -67,7 +67,7 @@ string SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionSt
 string SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
 bool SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
 bool AbortScriptOnSqlFailure = app.Configuration.GetValue("SqlLogging:AbortScriptOnFailure", true);
-bool Always200 = app.Configuration.GetValue("Always200", true); // Потом везде вычистить!!!
+bool Always200 = app.Configuration.GetValue("Always200", true);
 var ScriptCache = new Dictionary<string, Dictionary<string, Dictionary<string, object>>>();
 var CachedVariables = app.Configuration.GetSection("CachedVariables").GetChildren().ToArray().Select(x => $"{x.Value}").ToList();
 var PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren().ToList();
@@ -118,14 +118,12 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
     string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
     SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
 
-    string TranscriptPath = app.Configuration.GetValue("Transcript:Path", ScriptRoot)!;
-    string TranscriptFile = "";
-
+    string TranscriptPath = app.Configuration.GetValue("TranscriptPath", ScriptRoot)!;
+    string TranscriptFullPath = Path.GetFullPath(TranscriptPath);
     string DateStr = DateTime.Now.ToString("yyyy-MM-dd");
-    string TimeStr = DateTime.Now.ToString("HH-mm-ss");
+    string TimeStr = DateTime.Now.ToString("HH-mm-ss-ffffff");
     string GuidStr = System.Guid.NewGuid().ToString();
-    TranscriptFile = Path.Join(ScriptRoot, Wrapper, "Transcript", Script, DateStr, $"{Wrapper}_{Script}_{DateStr}_{TimeStr}_{PidFStr}_{GuidStr}.txt");
-
+    string TranscriptFile = Path.Join(Wrapper, Script, DateStr, $"{Wrapper}_{Script}_{DateStr}_{TimeStr}_{PidFStr}_{GuidStr}.txt");
 
     if (SqlLoggingEnabled) {
         AbortScriptOnSqlFailure = app.Configuration.GetValue("SqlLogging:AbortScriptOnFailure", true);
@@ -167,9 +165,13 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
         error = $"SQL Error";
     } else {
         var initialSessionState = System.Management.Automation.Runspaces.InitialSessionState.CreateDefault();
-        string conf_ExecPol = app.Configuration.GetValue("ExecutionPolicy", "Unrestricted")!;
-        var ExecPol = Enum.Parse(typeof(ExecutionPolicy), conf_ExecPol);
-        initialSessionState.ExecutionPolicy = (ExecutionPolicy)ExecPol;
+        string ExecutionPolicyString = app.Configuration.GetValue("ExecutionPolicy", "Unrestricted")!;
+        Enum.TryParse(ExecutionPolicyString, out ExecutionPolicy ExecutionPolicyEnum);
+        if (ExecutionPolicyEnum > 0) {
+            initialSessionState.ExecutionPolicy = ExecutionPolicyEnum;
+        } else {
+            initialSessionState.ExecutionPolicy = ExecutionPolicy.Unrestricted;
+        }
         var PSRunspace = System.Management.Automation.Runspaces.RunspaceFactory.CreateRunspace(initialSessionState);
         PSRunspace.Open();
 
@@ -183,10 +185,10 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
             
             if (Context.User.Identity!.AuthenticationType is not null && Context.User.Identity!.AuthenticationType.ToString().ToLower() == "basic") {
                 var Encoding = System.Text.Encoding.GetEncoding("utf-8");
-                string Authorization = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization")
-                    .Select(x => Regex.Replace(x.Value.ToString(),@"^basic\s*","",RegexOptions.IgnoreCase))
-                    .Select(x => Encoding.GetString(Convert.FromBase64String(x)))
-                    .FirstOrDefault("");
+                string Authorization = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization").
+                    Select(x => Regex.Replace(x.Value.ToString(),@"^basic\s*","",RegexOptions.IgnoreCase)).
+                    Select(x => Encoding.GetString(Convert.FromBase64String(x))).
+                    FirstOrDefault("");
                 if (Authorization.Length > 0) {
                     string u = Authorization.Split(":")[0];
                     string p = Authorization.Split(":")[1];
@@ -206,17 +208,18 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
             PwSh.Runspace.SessionStateProxy.SetVariable(_, ScriptCache[Wrapper][Script][_]);
         }
 
-        PwSh.AddCommand(WrapperFile);
-        PwSh.AddParameter("__SCRIPTFILE__", ScriptFile);
-        PwSh.AddParameter("__SCRIPTNAME__", Script);
-        PwSh.AddParameter("__WRAPPER__", Wrapper);
-        PwSh.AddParameter("__QUERY__", Query);
-        PwSh.AddParameter("__BODY__", Body);
-        PwSh.AddParameter("__METHOD__", Context.Request.Method);
-        PwSh.AddParameter("__USER__", Context.User);
-        PwSh.AddParameter("__CONTEXT__", Context);
-        PwSh.AddParameter("__CONTENTTYPE__", ContentType);
-        PwSh.AddParameter("__TRANSCRIPT_FILE__", TranscriptFile);
+        PwSh.
+            AddCommand(WrapperFile).
+            AddParameter("__SCRIPTFILE__", ScriptFile).
+            AddParameter("__SCRIPTNAME__", Script).
+            AddParameter("__WRAPPER__", Wrapper).
+            AddParameter("__QUERY__", Query).
+            AddParameter("__BODY__", Body).
+            AddParameter("__METHOD__", Context.Request.Method).
+            AddParameter("__USER__", Context.User).
+            AddParameter("__CONTEXT__", Context).
+            AddParameter("__CONTENTTYPE__", ContentType).
+            AddParameter("__TRANSCRIPT_FILE__", Path.Join(TranscriptFullPath,TranscriptFile));
 
         DateTime BeginDate = DateTime.Now;
 
@@ -478,62 +481,6 @@ List<Dictionary<string,object>> SqlInsert(string ConnectionString, string Table,
     return result;
 }
 
-List<Dictionary<string,object>> SqlSelect_old(string ConnectionString, string Table, Dictionary<string,dynamic> Filter, int Order = 1, bool ASC = false, int RowCount = 0) {
-    List<Dictionary<string,object>> result = new();
-    string OrderDirection = "";
-    if (ASC) {OrderDirection = "ASC";} else {OrderDirection = "DESC";}
-    Dictionary<string,string> Operators = new() {
-        ["="] = "=", ["!"] = "!=",
-        [">"] = ">=", ["!>"] = "<",
-        ["<"] = "<=", ["!<"] = ">",
-        ["~"] = "LIKE", ["!~"] = "NOT LIKE",
-        ["@"] = "IN", ["!@"] = "NOT IN",
-        ["^"] = "IS", ["!^"] = "IS NOT",
-    };
-    List<Dictionary<string,object>> FilterIter = Filter.Select((x,i) => new Dictionary<string,object>() {["index"]=i+1,["key"]=x.Key,["value"]=x.Value}).ToList();
-    List<Dictionary<string,object>> Filters = new();
-    foreach(var Filter_ in FilterIter) {
-        object index = Filter_["index"];
-        object value = Filter_["value"];
-        object key_raw = Filter_["key"];
-        string key_op = Operators.Keys.Where(x => key_raw.ToString()!.EndsWith(x)).LastOrDefault("=").ToString();
-        string op = Operators.GetValueOrDefault(key_op,"=");
-        string key_name = key_raw.ToString()!.Replace(key_op,"");
-        if (value.ToString()!.Contains("*") && key_op.EndsWith("~")) {value = value.ToString()!.Replace("*","%");}
-        Filters.Add(
-            new Dictionary<string,object>(){
-                ["column"] = key_name,
-                ["operator"] = op,
-                ["variable"] = $"@filter_{key_name}_{index}",
-                ["value"] = value,
-            }
-        );
-    }
-    
-    string Query = $@"
-        SET ROWCOUNT {RowCount};
-        SELECT * FROM [{Table.Trim('[',']')}]
-        WHERE 1=1 {String.Join(' ',Filters.Select(x => $"AND [{x["column"]}] {x["operator"]} {x["variable"]}"))}
-        ORDER BY {Order} {OrderDirection}
-    ";
-    
-    var connection = new System.Data.SqlClient.SqlConnection(ConnectionString);
-    var command = new System.Data.SqlClient.SqlCommand(Query, connection);
-    foreach (Dictionary<string,object> Filter_ in Filters) {
-        command.Parameters.AddWithValue(Filter_["variable"].ToString(),Filter_["value"]);
-    }
-    System.Data.DataTable dt = new();
-    System.Data.SqlClient.SqlDataAdapter adapter = new();
-    adapter.SelectCommand = command;
-    adapter.Fill(dt);
-    if (!dt.HasErrors) {
-        List<string> cols = new();
-        foreach(DataColumn col in dt.Columns) {cols.Add(col.ColumnName);}
-        foreach(DataRow row in dt.Rows) {result.Add(cols.ToDictionary(x => x, x => row[x]));}
-    }
-    return result;
-}
-
 List<Dictionary<string,object>> SqlUpdate(string ConnectionString, string Table, Dictionary<string,dynamic> Data, List<Dictionary<string,dynamic>> Filters, int RowCount = 0) {
     List<Dictionary<string,object>> result = new();
     List<string> Operators = new() {"=","!=",">",">=","<","<=","LIKE","NOT LIKE","IS NULL","IS NOT NULL"};
@@ -729,7 +676,7 @@ List<string> getRoles(HttpContext Context) {
     return Result;
 }
 
-app.Map("/check", async (HttpContext Context) =>
+app.MapGet("/config/check", async (HttpContext Context) =>
     {
         bool success = true;
         string ErrorMessage = "";
@@ -742,6 +689,60 @@ app.Map("/check", async (HttpContext Context) =>
         }
 
         await Context.Response.WriteAsJsonAsync(new { Success = success, Error = ErrorMessage }, jOptions);
+    }
+);
+
+app.MapGet("/config/show", async (HttpContext Context) =>
+    {
+        IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
+        Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
+        if (hasRole(Context,"Admin") || IsDevelopment) {
+            try {
+                string FileContent = File.ReadAllText("appsettings.json");
+                var JContent = ConvertFromJson(FileContent,RaiseError:true);
+                var jContent = ConvertToJson(JContent,RaiseError:true);
+                await Context.Response.WriteAsync(jContent);
+            } catch (Exception e) {
+                Context.Response.StatusCode = (int)System.Net.HttpStatusCode.ServiceUnavailable;
+                await Context.Response.WriteAsync(e.Message);
+            }
+            
+        } else {
+            Context.Response.StatusCode = (int)System.Net.HttpStatusCode.Forbidden;
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
+        }
+    }
+);
+
+app.MapPost("/config/upload", async (HttpContext Context) =>
+    {
+        IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
+        Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
+        if (!hasRole(Context,"Admin") && !IsDevelopment) {
+            await Context.Response.WriteAsJsonAsync(new { Success=false, Error="access denied" }, jOptions);
+        } else if (!Context.Request.HasJsonContentType()) {
+            await Context.Response.WriteAsJsonAsync(new { Success=false, Error="is not JSON" }, jOptions);
+        } else {
+            string Body = "";
+            try {
+                var streamReader = new StreamReader(Context.Request.Body, encoding: System.Text.Encoding.UTF8);
+                Body = await streamReader.ReadToEndAsync();
+                try {
+                    object jBody = ConvertFromJson(Body,RaiseError:true);
+                    string JBody = ConvertToJson(jBody,RaiseError:true);
+                    try {
+                        await File.WriteAllTextAsync("appsettings.json", JBody, Encoding.UTF8);
+                    } catch (Exception e) {
+                        await Context.Response.WriteAsJsonAsync(new { Success=false, Error=e.Message }, jOptions);
+                    }
+                } catch {
+                    await Context.Response.WriteAsJsonAsync(new { Success=false, Error="invalid JSON" }, jOptions);
+                }
+            } catch (Exception e) {
+                await Context.Response.WriteAsJsonAsync(new { Success=false, Error=e.Message }, jOptions);
+            }
+            
+        }
     }
 );
 
@@ -920,7 +921,6 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Scri
                         try {
                             var ParsedBody = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Body).ToDictionary(x => x.Key, x => x.Value.ToString());
                             Body = ConvertToJson(ParsedBody, maxDepth:2, compressOutput:true);
-
                         } catch {
                             success = false;
                             error = "invalid Body";
@@ -937,95 +937,6 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Scri
                 }
 
             }
-        }
-    }
-);
-
-app.MapGet("/log", async (HttpContext Context) =>
-    {
-        List<Dictionary<string,object>> data = new();
-        string Output = "";
-        bool success = true;
-        string error = "";
-        int Limit = 10;
-        int Order = 1;
-        bool ASC = false;
-        JsonObject.ConvertToJsonContext jsonContext = new JsonObject.ConvertToJsonContext(maxDepth: 4, enumsAsStrings: true, compressOutput: false);
-        Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
-        
-        IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
-        SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
-        SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
-
-        List<string> SearchColumns = new() {"id","BeginDate","EndDate","PID","UserName","IPAddress","Method","Wrapper","Script","Headers","Query","Body","Error","Success","HadErrors","PSObjects","StreamError","StreamWarning","StreamInformation","StreamVerbose"};
-        List<string> Operators = new() {"","=","!",">","!>","<","!<","~","!~"};
-
-        List<List<string>> ValidParamTemplates = SearchColumns.Select(x => Operators.Select(y => $"{x.ToLower()}{y}").ToList()).ToList();
-        Dictionary<string,dynamic> Query = new();
-        foreach (var _ in Context.Request.Query) {Query[_.Key.ToString().ToLower()] = _.Value.ToString();}
-        if (int.TryParse(Query.GetValueOrDefault("$limit","10"), out int Limit_)) {Limit = Limit_;} else {success=false;error="limit is not integer";}
-        if (int.TryParse(Query.GetValueOrDefault("$order","1"), out int Order_)) {Order = Order_;} else {success=false;error="order is not integer";}
-        if (int.TryParse(Query.GetValueOrDefault("$asc","0"), out int ASC_)) {ASC = ASC_ > 0 ? true : false;} else {success=false;error="asc is not integer";}
-        Dictionary<string,dynamic> Filter = Query.Where(x => !x.Key.StartsWith("$") && ValidParamTemplates.Any(y => y.Contains(x.Key))).ToDictionary(x => x.Key, x => x.Value);
-        
-        List<string> DateColumns = Filter.Select(x => x.Key).Where(x => x.StartsWith("begindate") || x.StartsWith("enddate")).ToList();
-        foreach (string DateColumn_ in DateColumns) {
-            
-            DateTime dt = new();
-            if (DateTime.TryParse(Filter[DateColumn_],out dt)) {
-                Filter[DateColumn_] = dt;
-            };
-        }
-        
-        SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
-        if (!SqlLoggingEnabled) {
-            if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.MethodNotAllowed;}
-            await Context.Response.WriteAsJsonAsync(new {Success=false,Error="sql logging disabled"}, jOptions);
-        } else if (!success) {
-            if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.BadRequest;}
-            await Context.Response.WriteAsJsonAsync(new {Success=false,Error=error}, jOptions);
-        } else if (!hasRole(Context,"Admin") && !IsDevelopment) {
-            if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.Forbidden;}
-            await Context.Response.WriteAsJsonAsync(new {Success=false,Error="access denied"}, jOptions);
-        } else {
-            try {
-                var rows = SqlSelect_old(SqlConnectionString,SqlTable,Filter,Order,ASC,Limit);
-                foreach(Dictionary<string,object> row in rows) {
-                    data.Add(
-                        new Dictionary<string,object>() {
-                            ["id"] = row["id"],
-                            ["BeginDate"] = row["BeginDate"],
-                            ["EndDate"] = row["EndDate"],
-                            ["PID"] = row["PID"],
-                            ["UserName"] = row["UserName"],
-                            ["IPAddress"] = row["IPAddress"],
-                            ["ContentType"] = row["ContentType"],
-                            ["Method"] = row["Method"],
-                            ["Wrapper"] = row["Wrapper"],
-                            ["Script"] = row["Script"],
-                            ["Success"] = row["Success"],
-                            ["Error"] = row["Error"],
-                            ["HadErrors"] = row["HadErrors"],
-                            ["Query"] = ConvertFromJson($"{row["Query"]}"),
-                            ["Body"] = ConvertFromJson($"{row["Body"]}"),
-                            ["PSObjects"] = ConvertFromJson($"{row["PSObjects"]}"),
-                            ["StreamError"] = ConvertFromJson($"{row["StreamError"]}"),
-                            ["StreamWarning"] = ConvertFromJson($"{row["StreamWarning"]}"),
-                            ["StreamInformation"] = ConvertFromJson($"{row["StreamInformation"]}"),
-                            ["StreamVerbose"] = ConvertFromJson($"{row["StreamVerbose"]}"),
-                            ["Headers"] = ConvertFromJson($"{row["Headers"]}"),
-                            ["TranscriptFile"] = row["TranscriptFile"],
-                        }
-                    );
-                }
-
-            } catch (Exception e) {
-                success = false;
-                error = e.Message;
-            }
-            Dictionary<string,object> result = new() {["Success"]=success,["Error"]=error,["Count"]=data.Count,["Data"]=data};
-            Output = ConvertToJson(result);
-            await Context.Response.WriteAsync(Output);
         }
     }
 );
@@ -1047,6 +958,7 @@ app.MapPost("/log", async (HttpContext Context) =>
         if (Context.Request.HasJsonContentType()) {
             try {
                 Filters = System.Text.Json.JsonDocument.Parse(Body).Deserialize<List<Dictionary<string,dynamic>>>();
+                // Filters = Context.Request.ReadFromJsonAsync<List<Dictionary<string,dynamic>>>(jOptions);
             } catch {
                 await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "invalid JSON" }, jOptions);
                 return;
@@ -1131,7 +1043,67 @@ app.MapPost("/log", async (HttpContext Context) =>
             }
             Dictionary<string,object> result = new() {["Success"]=success,["Error"]=error,["Count"]=data.Count,["Data"]=data};
             Output = ConvertToJson(result);
-            await Context.Response.WriteAsJsonAsync(Output);
+            await Context.Response.WriteAsync(Output);
+        }
+    }
+);
+
+app.MapGet("/log/{id:int}", async (int id, HttpContext Context) =>
+    {
+        IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
+        SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
+        SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
+
+        List<Dictionary<string,dynamic>> Filters = new(){
+            new Dictionary<string,dynamic>() {
+                ["column"] = "id", ["operator"] = "=", ["value"] = id
+            }
+        };
+
+        SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
+        if (!SqlLoggingEnabled) {
+            if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.MethodNotAllowed;}
+            await Context.Response.WriteAsJsonAsync(new {Success=false, Error="sql logging disabled"}, jOptions);
+        } else if (!hasRole(Context,"Admin") && !IsDevelopment) {
+            if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.Forbidden;}
+            await Context.Response.WriteAsJsonAsync(new {Success=false, Error="access denied"}, jOptions);
+        } else {
+            try {
+                var rows = SqlSelect(SqlConnectionString,SqlTable,Filters,Order:1,ASC:true,RowCount:1);
+                var row = rows.First();
+                Dictionary<string,object> data = new() {
+                    ["id"] = row["id"],
+                    ["BeginDate"] = row["BeginDate"],
+                    ["EndDate"] = row["EndDate"],
+                    ["PID"] = row["PID"],
+                    ["UserName"] = row["UserName"],
+                    ["IPAddress"] = row["IPAddress"],
+                    ["ContentType"] = row["ContentType"],
+                    ["Method"] = row["Method"],
+                    ["Wrapper"] = row["Wrapper"],
+                    ["Script"] = row["Script"],
+                    ["Success"] = row["Success"],
+                    ["Error"] = row["Error"],
+                    ["HadErrors"] = row["HadErrors"],
+                    ["Query"] = ConvertFromJson($"{row["Query"]}"),
+                    ["Body"] = ConvertFromJson($"{row["Body"]}"),
+                    ["PSObjects"] = ConvertFromJson($"{row["PSObjects"]}"),
+                    ["StreamError"] = ConvertFromJson($"{row["StreamError"]}"),
+                    ["StreamWarning"] = ConvertFromJson($"{row["StreamWarning"]}"),
+                    ["StreamInformation"] = ConvertFromJson($"{row["StreamInformation"]}"),
+                    ["StreamVerbose"] = ConvertFromJson($"{row["StreamVerbose"]}"),
+                    ["Headers"] = ConvertFromJson($"{row["Headers"]}"),
+                    ["TranscriptFile"] = row["TranscriptFile"],
+                };
+
+                Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
+                Dictionary<string,object> result = new() {["Success"]=true,["Error"]="",["Data"]=data};
+                string Output = ConvertToJson(result);
+                await Context.Response.WriteAsync(Output);
+                
+            } catch (Exception e) {
+                await Context.Response.WriteAsJsonAsync(new {Success=false, Error=e.Message});
+            }
         }
     }
 );
@@ -1158,6 +1130,7 @@ app.Map("/transcript/{id:int}", async (int id, HttpContext Context) =>
             Context.Response.StatusCode = (int)System.Net.HttpStatusCode.Forbidden;
             await Context.Response.WriteAsync("access denied");
         } else {
+
             try {
                 var rows = SqlSelect(SqlConnectionString,SqlTable,Filters);
                 foreach(Dictionary<string,object> row_ in rows) {
@@ -1168,7 +1141,9 @@ app.Map("/transcript/{id:int}", async (int id, HttpContext Context) =>
                     );
                 }
                 var row = data.First();
-                var TranscriptFileContent = File.ReadAllText(row["TranscriptFile"].ToString()!);
+                string TranscriptPath = app.Configuration.GetValue("TranscriptPath", ScriptRoot)!;
+                string TranscriptFile = Path.Join(TranscriptPath,row["TranscriptFile"].ToString()!);
+                var TranscriptFileContent = File.ReadAllText(TranscriptFile);
                 await Context.Response.WriteAsync(TranscriptFileContent);
 
             } catch (Exception e) {

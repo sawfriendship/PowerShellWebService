@@ -1,14 +1,9 @@
 ﻿// Please see documentation at https://docs.microsoft.com/aspnet/core/client-side/bundling-and-minification
 // for details on configuring this project to bundle and minify static web assets.
+var test = 0;
 
 var min_id = 0;
 var max_id = 0;
-
-function has_key(obj,key){
-    for (k in obj) {if(k==key){return true}}
-    return false
-}
-
 var table = $('#LogTable table')
 var thead = $('<thead><tr><th>id</th><th>BeginDate</th><th>UserName</th><th>IPAddress</th><th>Wrapper</th><th>Script</th><th>Method</th><th>Success</th><th>HadErrors</th><th>Error</th></tr></thead>')
 var tbody = $('<tbody></tbody>')
@@ -21,12 +16,12 @@ function load_modal(event_id) {
     _new_modal.find('.modal-title').html(`Event ${event_id}`)
 
     $.ajax({
-        url: '/log',
+        url: `/log/${event_id}`,
         method: 'GET',
-        data: {id:event_id},
         success: function(responce) {
+            console.log(responce)
             var jString = JSON.stringify(responce, null, 2);
-            if (responce.Success && responce.Count > 0) {
+            if (responce.Success && responce.Data) {
                 window.__renderJSONToHTMLTable({data: responce.Data, rootElement: '._new_modal .modal-body'});
             }
 
@@ -39,55 +34,44 @@ function load_modal(event_id) {
                 </div>
                 `
             ));
-            $('._btn_copy').on('click', ()=>navigator.clipboard.writeText($('#_result').val()));
-            // console.log('ok')
 
+            $('._btn_copy').on('click', ()=>navigator.clipboard.writeText($('#_result').val()));
+            console.log('log-ok')
+
+            $.ajax({
+                url: `/transcript/${event_id}`,
+                method: 'GET',
+                success: function(responce) {
+                    $('._new_modal .modal-body').append($(
+                        `
+                        <div id="Result" class="">
+                            <h3>Transcript</h3>
+                            <textarea id="_result" class="form-control bg-dark text-light border border-4 rounded rounded-5" rows="20" placeholder="Result" readonly>${responce}</textarea>
+                            <span class="btn btn-dark _btn_copy"><i class="bi bi-clipboard"></i></span>
+                        </div>
+                        `
+                    ));
+                    $('._btn_copy').on('click', ()=>navigator.clipboard.writeText($('#_result').val()));
+                    console.log('transcript-ok')
+                    console.log(data)
+        
+                },
+                error: function(responce) {
+                    console.log('transcript-err')
+                }
+            })
         },
         error: function(responce) {
-            // console.log('err')
-        },
-        complete: function(){
-            $('._new_modal .modal-body').append($(`<p>URL: <a href="${this.url}" target="_blank">${this.url}</a></p>`))
-        },
+            console.log('log-err')
+        }
     });
 
     $('._new_modal').modal('show')
 }
 
-function load_param() {
-    var form_items = [
-        '_interval','_count',
-        '_wrapper','_wrapper_op','_script','_script_op',
-        '_begindate1_op','_begindate1','_begindate2_op','_begindate2',
-        '_username_op','_username',
-        '_ipaddress','_ipaddress_op',
-        '_method','_method_op'
-    ]
-    
-    form_items.forEach(function(item){
-        $(`form [name=${item}]`).on('click change keyup', function(e){
-            if ($(this).val()) {
-                localStorage[item]=$(this).val()
-            } else {
-                localStorage.removeItem(item)
-            }
-            if (e.keyCode === 13) {
-                // window.location.reload();
-                min_id = 0;
-                max_id = 0;
-                tbody.html('')
-                load_data(direction=1);
-            }
-        });
-        if (has_key(localStorage,item)) {
-            $(`form [name=${item}]`).val(localStorage[item])
-        } else {
-            localStorage[item] = $(`form [name=${item}]`).val()
-        }
-    })
-}
-
 function load_data(direction=0) {
+    var form_interval = $('form #_load_param [name=_interval]')
+    var form_count = $('form #_load_param [name=_count]')
     var filter = {}
     var filter_ = {'$limit':10,'$order':1}
     
@@ -112,8 +96,8 @@ function load_data(direction=0) {
 
 
     $.ajax({
-        url: '/log',
-        method: 'GET',
+        url: `/log?interval=${form_interval.val()}&count=${form_count.val()}`,
+        method: 'POST',
         data: filter,
         success: function(responce) {
             var data = responce.Data;
@@ -158,7 +142,6 @@ function load_data(direction=0) {
 
 }
 
-
 // https://doka.guide/js/infinite-scroll/?ysclid=li4zwmwam8358176772
 
 function checkPosition() {
@@ -200,23 +183,20 @@ function throttle(callee, timeout) {
 var reload_timer_id = 0;
 
 $(document).ready(function() {
-    if (has_key(localStorage,'_interval')) {
-        $(`form [name=_interval]`).val(localStorage['_interval'])
-    } else {
-        $(`form [name=_interval]`).val(10)
-        localStorage['_interval'] = $(`form [name=_interval]`).val()
+    var form_interval = $('form #_load_param [name=_interval]')
+    if (form_interval.val() > 0) {
+        reload_timer_id = setInterval(() => load_data(1), form_interval.val()*1000);
     }
-    reload_timer_id = setInterval(() => load_data(1), localStorage['_interval']*1000);
-    $('form [name=_interval]').on('click change keyup', function(e){
+    form_interval.on('click change keyup', function(){
         clearInterval(reload_timer_id);
-        reload_timer_id = setInterval(() => load_data(1), localStorage['_interval']*1000);
+        reload_timer_id = setInterval(() => load_data(1), form_interval.val()*1000);
     });
 
     min_id = 0;
     max_id = 0;
 
-    load_data(0);
-    load_param();
+    // load_data(0);
+    // load_param();
     
     $('#LogTable tbody').on('click', 'tr', function(e){var row_id = $(this).attr('row_id');load_modal(row_id);});
     $('#Modals').on('click', '._modal_close', function(e){$('._new_modal').modal('hide');});

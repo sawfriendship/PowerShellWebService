@@ -1,8 +1,8 @@
-.scripts/*/Transcript
 appsettings.*.json
 bin
 obj
 logs
+.transcript
 .vs
 .vscode
 *.bak

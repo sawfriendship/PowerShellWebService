@@ -1,20 +1,53 @@
 ﻿@page
 @model IndexModel
+@using System.Linq
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
 
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "History";
+    bool IsDevelopment = Configuration.GetValue("IsDevelopment",false);
+    var Query = Request.Query.ToDictionary(x => x.Key.ToString().ToLower(), x => x.Value.ToString());
+    string PwShUrl = Configuration.GetValue("PwShUrl","api")!;
+    bool IsAuthenticated = HttpContext.User.Identity.IsAuthenticated;
+    bool SqlLoggingEnabled = Configuration.GetValue("SqlLogging:Enabled", false);
+    string UserName = HttpContext.User.Identity!.Name ?? "%UserName%";
+    bool UserIsInRoleAdmin = hasRole(HttpContext,"Admin");
+    bool UserIsInRoleUser = hasRole(HttpContext,"User");
+    // var UserRoles = getRoles(@Request.HttpContext);
 }
-@* <h1>@ViewData["Title"]</h1> *@
 
-@if (!@Model.IsAuthenticated && !@Model.IsDevelopment) {
+@functions {
+    public bool hasRole(HttpContext Context, string Role = "") {
+        List<IConfigurationSection> Roles = Configuration.GetSection("Roles").GetChildren().Where(x => Role.Length == 0 || x.Key.ToLower() == Role.ToLower()).ToList();
+        foreach (IConfigurationSection Role_ in Roles) {
+            if (Configuration.GetSection(Role_.Path).GetChildren().Any(x => Context.User.IsInRole($"{x.Value}"))) {
+                return true;
+            };
+        }
+        return false;
+    }
+    public List<string> getRoles(HttpContext Context) {
+        List<IConfigurationSection> Roles = Configuration.GetSection("Roles").GetChildren().ToList();
+        List<string> Result = new();
+        foreach (IConfigurationSection Role_ in Roles) {
+            if (Configuration.GetSection(Role_.Path).GetChildren().Any(x => Context.User.IsInRole($"{x.Value}"))) {
+                Result.Add(Role_.Key);
+            };
+        }
+        return Result;
+    }
+}
+
+@if (!IsAuthenticated && !IsDevelopment) {
     <div class="text-center"><h3>Вы не авторизованы</h3></div>
-} else if (!(@Model.UserIsInRoleAdmin || @Model.UserIsInRoleUser) && !@Model.IsDevelopment) {
+} else if (!hasRole(HttpContext) && !IsDevelopment) {
     <div class="text-center"><h3>У вас нет прав на просмотр этой страницы</h3></div>
 } else {
-    if (@Model.IsDevelopment) {
+    if (IsDevelopment) {
         <div class="text-center text-danger"><h3>Включен режим разработки, права пользователей не учитываются!</h3></div>
     }
-    if (@Model.UserIsInRoleAdmin || @Model.IsDevelopment) {
+    if (UserIsInRoleAdmin || IsDevelopment) {
         <h3>Вы зашли в роли администратора</h3>
         <p><b>Этот сервис предназначен для работы на веб-сервере IIS для упрощения обмена данными с PowerShell.</b></p>
         <br>
