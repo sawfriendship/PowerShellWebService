@@ -800,15 +800,16 @@ app.Map("/logout", async (HttpContext Context) =>
 
 app.Map("/login", async (HttpContext Context) =>
     {
-        long dt = DateTime.Now.ToFileTime();
+        DateTime dt = DateTime.Now;
+        long fileTime = dt.ToFileTime();
         Dictionary<string,string> Query = Context.Request.Query.ToDictionary(x => x.Key.ToString().ToLower(), x => x.Value.ToString());
-        if (int.TryParse(Query.GetValueOrDefault("dt",$"{dt}"), out int dt_)) {dt = dt_;}
-        long diff = DateTime.Now.ToFileTime() - dt;
-        if (diff > 1E+7) {
+        if (long.TryParse(Query.GetValueOrDefault("dt",$"{fileTime}"), out long dt_)) {dt = DateTime.FromFileTime(dt_);}
+        if (dt.AddSeconds(1) > DateTime.Now) {
             Context.Response.StatusCode = (int)System.Net.HttpStatusCode.Unauthorized;
-            await Context.Response.WriteAsync(">");
+            await Context.Response.WriteAsync("logout");
         } else {
-            await Context.Response.WriteAsync("<");
+            Context.Response.Redirect("/", permanent: false);
+            await Context.Response.WriteAsync("login");
         }
     }
 );
