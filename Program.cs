@@ -804,7 +804,7 @@ app.Map("/login", async (HttpContext Context) =>
         Dictionary<string,string> Query = Context.Request.Query.ToDictionary(x => x.Key.ToString().ToLower(), x => x.Value.ToString());
         if (int.TryParse(Query.GetValueOrDefault("dt",$"{dt}"), out int dt_)) {dt = dt_;}
         long diff = DateTime.Now.ToFileTime() - dt;
-        if (diff > 1E+3) {
+        if (diff > 1E+9) {
             Context.Response.StatusCode = (int)System.Net.HttpStatusCode.Unauthorized;
             await Context.Response.WriteAsync(">");
         } else {
