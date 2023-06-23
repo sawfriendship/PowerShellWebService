@@ -773,6 +773,8 @@ app.Map("/whoami", async (HttpContext Context) =>
         var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
         string AuthorizationHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization").Select(x => x.Key).FirstOrDefault("");
         if (Headers.ContainsKey(AuthorizationHeader)) { Headers[AuthorizationHeader] = $"{Context.User.Identity!.AuthenticationType} ***"; }
+        string CookieHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "cookie").Select(x => x.Key).FirstOrDefault("");
+        if (Headers.ContainsKey(CookieHeader)) { Headers[CookieHeader] = "***"; }
 
         Dictionary<String, object> UserInfo = new()
         {
@@ -788,19 +790,26 @@ app.Map("/whoami", async (HttpContext Context) =>
     }
 );
 
-// app.Map("/logout", (HttpContext Context) => Results.LocalRedirect("/login"));
-
 app.Map("/logout", async (HttpContext Context) =>
-    {
-        Context.Response.Redirect("/login", permanent: false);
+    {   
+        long dt = DateTime.Now.ToFileTime();
+        Context.Response.Redirect($"/login?dt={dt}", permanent: false);
         await Context.Response.WriteAsync("logout");
     }
 );
 
 app.Map("/login", async (HttpContext Context) =>
     {
-        if (Context.Request.Method != "GET") {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.Unauthorized;}
-        await Context.Response.WriteAsync("login");
+        long dt = DateTime.Now.ToFileTime();
+        Dictionary<string,string> Query = Context.Request.Query.ToDictionary(x => x.Key.ToString().ToLower(), x => x.Value.ToString());
+        if (int.TryParse(Query.GetValueOrDefault("dt",$"{dt}"), out int dt_)) {dt = dt_;}
+        long diff = DateTime.Now.ToFileTime() - dt;
+        if (diff > 1E+3) {
+            Context.Response.StatusCode = (int)System.Net.HttpStatusCode.Unauthorized;
+            await Context.Response.WriteAsync(">");
+        } else {
+            await Context.Response.WriteAsync("<");
+        }
     }
 );
 

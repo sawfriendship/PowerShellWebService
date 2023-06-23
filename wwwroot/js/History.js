@@ -69,36 +69,22 @@ function load_modal(event_id) {
     $('._new_modal').modal('show')
 }
 
-function load_data(direction=0) {
+function load_data(asc=0) {
     var form_interval = $('form #_load_param [name=_interval]')
     var form_count = $('form #_load_param [name=_count]')
     var filter = {}
-    var filter_ = {'$limit':10,'$order':1}
-    
-    if (has_key(localStorage,'_count') && localStorage['_count']) {filter['$limit'] = localStorage['_count']}
-    if (has_key(localStorage,'_wrapper') && localStorage['_wrapper']) {filter[`Wrapper${localStorage['_wrapper_op']}`] = localStorage['_wrapper']}
-    if (has_key(localStorage,'_script') && localStorage['_script']) {filter[`Script${localStorage['_script_op']}`] = localStorage['_script']}
-    if (has_key(localStorage,'_begindate1') && localStorage['_begindate1']) {filter[`BeginDate${localStorage['_begindate1_op']}`] = localStorage['_begindate1']}
-    if (has_key(localStorage,'_begindate2') && localStorage['_begindate2']) {filter[`BeginDate${localStorage['_begindate2_op']}`] = localStorage['_begindate2']}
-    if (has_key(localStorage,'_username') && localStorage['_username']) {filter[`UserName${localStorage['_username_op']}`] = localStorage['_username']}
-    if (has_key(localStorage,'_ipaddress') && localStorage['_ipaddress']) {filter[`IPAddress${localStorage['_ipaddress_op']}`] = localStorage['_ipaddress']}
-    if (has_key(localStorage,'_method') && localStorage['_method']) {filter[`Method${localStorage['_method_op']}`] = localStorage['_method']}
-    
-    console.log(filter)
-    
-    if (direction == 0 || max_id == 0 || min_id == 0) {
-        filter = Object.assign(filter,filter_,{'$asc':0,'$limit':10})
-    } else if (direction > 0 && max_id != 0 && min_id != 0) {
-        filter = Object.assign(filter,filter_,{'$asc':1,'id!<':max_id})
-    } else if (direction < 0 && max_id != 0 && min_id != 0) {
-        filter = Object.assign(filter,filter_,{'$asc':0,'id!>':min_id})
-    } else {}
-
-
+    if (asc < 0.5) {
+        d_op = '>'
+        d_val = max_id
+    } else {
+        d_op = '<'
+        d_val = min_id
+    }
     $.ajax({
-        url: `/log?interval=${form_interval.val()}&count=${form_count.val()}`,
+        url: `/log?asc=${asc}&interval=${form_interval.val()}&count=${form_count.val()}`,
         method: 'POST',
-        data: filter,
+        contentType: 'application/json',
+        data: `[{"column":"id","operator":"${d_op}","value":"${d_val}"}]`,
         success: function(responce) {
             var data = responce.Data;
             if (responce.Success && responce.Count > 0) {
@@ -195,7 +181,7 @@ $(document).ready(function() {
     min_id = 0;
     max_id = 0;
 
-    // load_data(0);
+    load_data(0);
     // load_param();
     
     $('#LogTable tbody').on('click', 'tr', function(e){var row_id = $(this).attr('row_id');load_modal(row_id);});
