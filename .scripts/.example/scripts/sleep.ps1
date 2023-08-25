@@ -1,2 +1,2 @@
-Start-Sleep @Params
-$Params
+Start-Sleep @__PARAMS__
+$__PARAMS__

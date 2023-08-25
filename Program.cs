@@ -81,9 +81,12 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
     ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
     PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren().ToList();
     UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
-    Dictionary<string, string> Query = Context.Request.Query.ToDictionary(x => x.Key, x => $"{x.Value}");
-    Dictionary<string, string> Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => $"{x.Value}");
+    List<string> OutputFormats = new() {"json","text","html"};
+    System.Text.RegularExpressions.Regex __Keys__ = new Regex(@"^__.+__$", RegexOptions.IgnoreCase);
+    Dictionary<string, string> Query = Context.Request.Query.Where(x => !__Keys__.IsMatch(x.Key)).ToDictionary(x => x.Key, x => $"{x.Value}");
+    Dictionary<string, string> Headers = Context.Request.Headers.Where(x => !__Keys__.IsMatch(x.Key)).ToDictionary(x => x.Key, x => $"{x.Value}");
     string AuthorizationHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization").Select(x => x.Key).FirstOrDefault("");
+    string OutputFormat = Context.Request.Headers.Where(x => x.Key.ToLower() == "format" && OutputFormats.Contains($"{x.Value}".ToLower())).Select(x => $"{x.Value}".ToLower()).FirstOrDefault("json");
     string ContentType = $"{Context.Request.ContentType}";
     if (Headers.ContainsKey(AuthorizationHeader)) { Headers[AuthorizationHeader] = $"{Context.User.Identity!.AuthenticationType} ***"; }
 
@@ -91,10 +94,12 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
     bool enumsAsStrings = app.Configuration.GetValue("JsonSerialization:enumsAsStrings", true);
     bool compressOutput = app.Configuration.GetValue("JsonSerialization:compressOutput", false);
 
+    string q_format = Context.Request.Query.Where(x => x.Key.ToLower() == "__format__" && OutputFormats.Contains($"{x.Value}".ToLower())).Select(x => $"{x.Value}".ToLower()).FirstOrDefault("");
     string h_depth = Context.Request.Headers.Where(x => x.Key.ToLower() == "depth" || x.Key.ToLower() == "maxdepth").Select(x => x.Key).FirstOrDefault("");
     string h_enums = Context.Request.Headers.Where(x => x.Key.ToLower() == "enums" || x.Key.ToLower() == "enumsAsStrings").Select(x => x.Key).FirstOrDefault("");
     string h_compress = Context.Request.Headers.Where(x => x.Key.ToLower() == "compress" || x.Key.ToLower() == "compressOutput").Select(x => x.Key).FirstOrDefault("");
 
+    if (q_format.Length > 0 && OutputFormats.Contains(q_format)) { OutputFormat = q_format; }
     if (h_depth.Length > 0) { if (int.TryParse(Headers[h_depth], out int h_depth_)) { maxDepth = h_depth_; }}
     if (h_enums.Length > 0) { if (int.TryParse(Headers[h_enums], out int h_enums_)) { enumsAsStrings = Convert.ToBoolean(h_enums_); }}
     if (h_compress.Length > 0) { if (int.TryParse(Headers[h_compress], out int h_compress_)) { compressOutput = Convert.ToBoolean(h_compress_); }}
@@ -149,10 +154,9 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
         if (app.Configuration.GetValue("SqlLogging:Fields:Headers", true)) {SqlLogParam["Headers"] = ConvertToJson(Headers,compressOutput:true);}
         if (app.Configuration.GetValue("SqlLogging:Fields:Query", true)) {SqlLogParam["Query"] = ConvertToJson(Query,compressOutput:true);}
         if (app.Configuration.GetValue("SqlLogging:Fields:Body", true)) {SqlLogParam["Body"] = Body;}
+
+        if (Context.User.Identity!.Name is not null) {SqlLogParam["UserName"] = Context.User.Identity.Name;}
         
-        if (Context.User.Identity!.Name is not null) {
-            SqlLogParam["UserName"] = Context.User.Identity.Name;
-        }
         try {
             SqlRecord = SqlInsert(SqlConnectionString,SqlTable,SqlLogParam).First();
         } catch (Exception e) {
@@ -367,20 +371,31 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
 
     }
 
-    try {
-        ResultTable["Error"] = error;
-        ResultTable["Success"] = success;
-        ResultTable["Streams"] = Streams;
-        ResultTable["InvocationStateInfo"] = StateInfo;
-        PSOutputString = ConvertToJson(ResultTable,maxDepth:maxDepth,enumsAsStrings:enumsAsStrings,compressOutput:compressOutput,RaiseError:true);
-    } catch (Exception e) {
-        Streams.Clear();
-        success = false;
-        ResultTable["Success"] = success;
-        ResultTable["Error"] = $"JSON serialization error: {e}";
-        ResultTable["Streams"] = Streams;
-        ResultTable["InvocationStateInfo"] = StateInfo;
-        PSOutputString = ConvertToJson(ResultTable,maxDepth:maxDepth,enumsAsStrings:enumsAsStrings,compressOutput:compressOutput,RaiseError:false);
+    if (OutputFormat == "json") {
+        try {
+            ResultTable["Error"] = error;
+            ResultTable["Success"] = success;
+            ResultTable["Streams"] = Streams;
+            ResultTable["InvocationStateInfo"] = StateInfo;
+            PSOutputString = ConvertToJson(ResultTable,maxDepth:maxDepth,enumsAsStrings:enumsAsStrings,compressOutput:compressOutput,RaiseError:true);
+        } catch (Exception e) {
+            Streams.Clear();
+            success = false;
+            ResultTable["Success"] = success;
+            ResultTable["Error"] = $"JSON serialization error: {e}";
+            ResultTable["Streams"] = Streams;
+            ResultTable["InvocationStateInfo"] = StateInfo;
+            PSOutputString = ConvertToJson(ResultTable,maxDepth:maxDepth,enumsAsStrings:enumsAsStrings,compressOutput:compressOutput,RaiseError:false);
+        }
+    } else {
+        var Strings = new StringBuilder();
+        Dictionary<string,object> OutputFormatSepMap = new() {
+            ["text"] = (char)13,
+            ["html"] = "<br>",
+        };
+
+        PSObjects.ToList().ForEach(x => Strings.Append($"{x}{OutputFormatSepMap[OutputFormat]}"));
+        PSOutputString = Strings.ToString();
     }
 
 
@@ -880,6 +895,7 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Scri
         Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
         bool WrapperPermission = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().Any(x => Context.User.IsInRole($"{x.Value}"));
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
+        
         if (!WrapperPermission && !IsDevelopment) {
             if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.Forbidden;}
             await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
@@ -888,6 +904,12 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Scri
             string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
             string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
             string hostname = Context.Request.Host.ToString();
+            
+            List<string> OutputFormats = new() {"json","text","html"};
+            string OutputFormat = Context.Request.Headers.Where(x => x.Key.ToLower() == "format" && OutputFormats.Contains($"{x.Value}".ToLower())).Select(x => $"{x.Value}".ToLower()).FirstOrDefault("json");
+            string q_format = Context.Request.Query.Where(x => x.Key.ToLower() == "__format__" && OutputFormats.Contains($"{x.Value}".ToLower())).Select(x => $"{x.Value}".ToLower()).FirstOrDefault("");
+            if (q_format.Length > 0 && OutputFormats.Contains(q_format)) { OutputFormat = q_format; }
+
             if (!ScriptCache.ContainsKey(Wrapper)) {
                 if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.NotFound;}
                 await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Wrapper '{Wrapper}' not found in cache, use {hostname}/reload to load new scripts or wrappers and {hostname}/clear to clear all" }, jOptions);
@@ -908,7 +930,12 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Scri
                 bool success = true;
                 string error = "";
 
-                // if (ContentType.Contains("application/json")) {
+                Dictionary<string,string> OutputFormatMap = new() {
+                    ["json"] = "application/json; charset=utf-8",
+                    ["text"] = "text/plain; charset=utf-8",
+                    ["html"] = "text/html; charset=utf-8",
+                };
+
                 if (Context.Request.HasJsonContentType()) {
                     try {
                         object _ = ConvertFromJson(Body,RaiseError:true);
@@ -939,6 +966,7 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Scri
 
                 if (success) {
                     OutputString = PSScriptRunner(Wrapper, Script, Body, Context);
+                    Context.Response.Headers["Content-Type"] = OutputFormatMap[OutputFormat];
                     await Context.Response.WriteAsync(OutputString);
                 } else {
                     if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.BadRequest;}

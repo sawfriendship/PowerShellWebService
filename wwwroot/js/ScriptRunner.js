@@ -168,14 +168,22 @@ function send_body() {
             $('._btn_send').removeClass('disabled')
             $('#_result').removeClass('processing')
             console.log(url,method,responce)
-            if (outputtype == 'Raw') {var result = responce
-            } else if (outputtype == 'Streams') {var result = responce.Streams
-            } else if (outputtype == 'PSObjects') {var result = responce.Streams.PSObjects
-            } else if (outputtype == 'Error') {var result = responce.Streams.Error
-            } else if (outputtype == 'Warning') {var result = responce.Streams.Warning
-            } else if (outputtype == 'Verbose') {var result = responce.Streams.Verbose
-            } else if (outputtype == 'Information') {var result = responce.Streams.Information
-            } else if (outputtype == 'Debug') {var result = responce.Streams.Debug
+            if (outputtype == 'All') {
+                var result = responce
+            } else if (outputtype == 'Streams') {
+                var result = responce.Streams
+            } else if (outputtype == 'PSObjects') {
+                var result = responce.Streams.PSObjects
+            } else if (outputtype == 'Error') {
+                var result = responce.Streams.Error
+            } else if (outputtype == 'Warning') {
+                var result = responce.Streams.Warning
+            } else if (outputtype == 'Verbose') {
+                var result = responce.Streams.Verbose
+            } else if (outputtype == 'Information') {
+                var result = responce.Streams.Information
+            } else if (outputtype == 'Debug') {
+                var result = responce.Streams.Debug
             } else {}
             var result_string = JSON.stringify(result, null, 2)
             $('#_result ').val(result_string)
