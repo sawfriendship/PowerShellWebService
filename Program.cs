@@ -388,13 +388,15 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
             PSOutputString = ConvertToJson(ResultTable,maxDepth:maxDepth,enumsAsStrings:enumsAsStrings,compressOutput:compressOutput,RaiseError:false);
         }
     } else {
-        var Strings = new StringBuilder();
         Dictionary<string,object> OutputFormatSepMap = new() {
             ["text"] = (char)13,
             ["html"] = "<br>",
         };
 
-        PSObjects.ToList().ForEach(x => Strings.Append($"{x}{OutputFormatSepMap[OutputFormat]}"));
+        // var Strings = new StringBuilder();
+        // PSObjects.ToList().ForEach(x => Strings.Append($"{x}{OutputFormatSepMap[OutputFormat]}"));
+        StringBuilder Strings = PSObjects.Select(x => x).Aggregate(new StringBuilder(), (current, next) => current.Append(next).Append(OutputFormatSepMap[OutputFormat]));
+
         PSOutputString = Strings.ToString();
     }
 
@@ -893,10 +895,11 @@ app.Map($"/{PwShUrl}/{{Wrapper}}", async (string Wrapper, HttpContext Context) =
 app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Script, HttpContext Context) =>
     {
         Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
+        bool WrapperIsPublic = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().Count() == 0;
         bool WrapperPermission = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().Any(x => Context.User.IsInRole($"{x.Value}"));
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
         
-        if (!WrapperPermission && !IsDevelopment) {
+        if (!WrapperPermission && !WrapperIsPublic && !IsDevelopment) {
             if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.Forbidden;}
             await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
         } else {

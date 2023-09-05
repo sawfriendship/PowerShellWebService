@@ -186,7 +186,7 @@ function send_body() {
                 var result = responce.Streams.Debug
             } else {}
             var result_string = JSON.stringify(result, null, 2)
-            $('#_result ').val(result_string)
+            $('#_result').val(result_string)
             if (!responce.Success || responce.Error || responce.Streams.HadErrors){
                 $('#_result').removeClass('border-success _result_success').addClass('border-danger _result_error')
             } else {
