@@ -1,1 +1,0 @@
-Get-InstalledModule | select Name,@{n='Version';e={[string]$_.Version}}

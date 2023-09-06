@@ -1,16 +1,16 @@
 param(
-    [string]$Name = '*'
+    [string]$Name = '*',
+    [int]$Limit = 5
 )
 
-# $ls = ls -Path env:\ | ? Name -like $Name | select Name,Value
-$ls = ls -Path "env:\$Name" | select Name,Value
+$ps = ps -Name $Name | select id,name -f $Limit
 
 if ($__FORMAT__ -eq 'json') {
-    $ls
+    $ps
 } elseif ($__FORMAT__ -eq 'txt') {
-    $ls | Out-String
+    $ps | Out-String
 } elseif ($__FORMAT__ -eq 'csv') {
-    $ls | ConvertTo-Csv -Delimiter ';'
+    $ps | ConvertTo-Csv -Delimiter ';'
 } elseif ($__FORMAT__ -eq 'html') {
 @"
     <!DOCTYPE html>
@@ -47,19 +47,23 @@ if ($__FORMAT__ -eq 'json') {
                                 <div class="input-group input-group-sm w-100">
                                     <label for="Name" class="form-label w-25">Wrapper</label>
                                     <input id="Name" name="Name" class="form-control w-50" value="$Name">
-                                    <input type="submit" class="btn btn-outline-dark w-25" value="Post!" />
+                                    </div>
+                                    <div class="input-group input-group-sm w-100">
+                                    <label for="Limit" class="form-label w-25">Limit</label>
+                                    <input id="Limit" name="Limit" class="form-control w-50" value="$Limit">
                                 </div>
+                                <input type="submit" class="btn btn-outline-dark w-25" value="Post!" />
                             </form>
                             <br>
                             1
-                            $($ls | ConvertTo-Html -Property Name,Value)
+                            $($ps | ConvertTo-Html -Property id,name)
                             2
                             <table class="table">
                                 <thead>
-                                    <th>Name</th><th>Value</th>
+                                    <th>id</th><th>Name</th>
                                 </thead>
                                 <tbody>
-                                    $($ls | % {"<tr><td>$($_.Name)</td><td>$($_.Value)</td></tr>"})
+                                    $($ps | % {"<tr><td>$($_.id)</td><td>$($_.Name)</td></tr>"})
                                 </tbody>
                             </table>
 

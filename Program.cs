@@ -72,21 +72,30 @@ var ScriptCache = new Dictionary<string, Dictionary<string, Dictionary<string, o
 var CachedVariables = app.Configuration.GetSection("CachedVariables").GetChildren().ToArray().Select(x => $"{x.Value}").ToList();
 var PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren().ToList();
 var jOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = false , MaxDepth = 5, WriteIndented = true};
+Dictionary<string,string> FormatMap = new() {
+    ["json"] = "application/json; charset=utf-8",
+    ["txt"] = "text/plain; charset=utf-8",
+    ["csv"] = "text/plain; charset=utf-8",
+    ["html"] = "text/html; charset=utf-8",
+};
+Dictionary<string,string> FormatSeparatorMap = new() {
+    ["html"] = "<br>"
+};
 
 if (SqlLoggingEnabled) {SqlTableCreate(SqlConnectionString, SqlTable);}
 
 ScriptLoader();
 
-string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Context) {
+string PSScriptRunner(string Wrapper, string Script, string Body, string Format, HttpContext Context) {
     ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
     PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren().ToList();
     UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
-    List<string> OutputFormats = new() {"json","text","html"};
+    // List<string> OutputFormats = new() {"json","text","html"};
     System.Text.RegularExpressions.Regex __Keys__ = new Regex(@"^__.+__$", RegexOptions.IgnoreCase);
     Dictionary<string, string> Query = Context.Request.Query.Where(x => !__Keys__.IsMatch(x.Key)).ToDictionary(x => x.Key, x => $"{x.Value}");
     Dictionary<string, string> Headers = Context.Request.Headers.Where(x => !__Keys__.IsMatch(x.Key)).ToDictionary(x => x.Key, x => $"{x.Value}");
     string AuthorizationHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization").Select(x => x.Key).FirstOrDefault("");
-    string OutputFormat = Context.Request.Headers.Where(x => x.Key.ToLower() == "format" && OutputFormats.Contains($"{x.Value}".ToLower())).Select(x => $"{x.Value}".ToLower()).FirstOrDefault("json");
+    // string OutputFormat = Context.Request.Headers.Where(x => x.Key.ToLower() == "format" && OutputFormats.Contains($"{x.Value}".ToLower())).Select(x => $"{x.Value}".ToLower()).FirstOrDefault("json");
     string ContentType = $"{Context.Request.ContentType}";
     if (Headers.ContainsKey(AuthorizationHeader)) { Headers[AuthorizationHeader] = $"{Context.User.Identity!.AuthenticationType} ***"; }
 
@@ -94,12 +103,12 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
     bool enumsAsStrings = app.Configuration.GetValue("JsonSerialization:enumsAsStrings", true);
     bool compressOutput = app.Configuration.GetValue("JsonSerialization:compressOutput", false);
 
-    string q_format = Context.Request.Query.Where(x => x.Key.ToLower() == "__format__" && OutputFormats.Contains($"{x.Value}".ToLower())).Select(x => $"{x.Value}".ToLower()).FirstOrDefault("");
+    // string q_format = Context.Request.Query.Where(x => x.Key.ToLower() == "__format__" && OutputFormats.Contains($"{x.Value}".ToLower())).Select(x => $"{x.Value}".ToLower()).FirstOrDefault("");
     string h_depth = Context.Request.Headers.Where(x => x.Key.ToLower() == "depth" || x.Key.ToLower() == "maxdepth").Select(x => x.Key).FirstOrDefault("");
     string h_enums = Context.Request.Headers.Where(x => x.Key.ToLower() == "enums" || x.Key.ToLower() == "enumsAsStrings").Select(x => x.Key).FirstOrDefault("");
     string h_compress = Context.Request.Headers.Where(x => x.Key.ToLower() == "compress" || x.Key.ToLower() == "compressOutput").Select(x => x.Key).FirstOrDefault("");
 
-    if (q_format.Length > 0 && OutputFormats.Contains(q_format)) { OutputFormat = q_format; }
+    // if (q_format.Length > 0 && OutputFormats.Contains(q_format)) { OutputFormat = q_format; }
     if (h_depth.Length > 0) { if (int.TryParse(Headers[h_depth], out int h_depth_)) { maxDepth = h_depth_; }}
     if (h_enums.Length > 0) { if (int.TryParse(Headers[h_enums], out int h_enums_)) { enumsAsStrings = Convert.ToBoolean(h_enums_); }}
     if (h_compress.Length > 0) { if (int.TryParse(Headers[h_compress], out int h_compress_)) { compressOutput = Convert.ToBoolean(h_compress_); }}
@@ -223,6 +232,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
             AddParameter("__USER__", Context.User).
             AddParameter("__CONTEXT__", Context).
             AddParameter("__CONTENTTYPE__", ContentType).
+            AddParameter("__FORMAT__", Format).
             AddParameter("__TRANSCRIPT_FILE__", Path.Join(TranscriptFullPath,TranscriptFile));
 
         DateTime BeginDate = DateTime.Now;
@@ -371,7 +381,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
 
     }
 
-    if (OutputFormat == "json") {
+    if (Format == "json") {
         try {
             ResultTable["Error"] = error;
             ResultTable["Success"] = success;
@@ -388,15 +398,8 @@ string PSScriptRunner(string Wrapper, string Script, string Body, HttpContext Co
             PSOutputString = ConvertToJson(ResultTable,maxDepth:maxDepth,enumsAsStrings:enumsAsStrings,compressOutput:compressOutput,RaiseError:false);
         }
     } else {
-        Dictionary<string,object> OutputFormatSepMap = new() {
-            ["text"] = (char)13,
-            ["html"] = "<br>",
-        };
-
-        // var Strings = new StringBuilder();
-        // PSObjects.ToList().ForEach(x => Strings.Append($"{x}{OutputFormatSepMap[OutputFormat]}"));
-        StringBuilder Strings = PSObjects.Select(x => x).Aggregate(new StringBuilder(), (current, next) => current.Append(next).Append(OutputFormatSepMap[OutputFormat]));
-
+        string FormatSeparator = FormatSeparatorMap.GetValueOrDefault(Format,$"{(char)13}");
+        StringBuilder Strings = PSObjects.Select(x => x).Aggregate(new StringBuilder(), (current, next) => current.Append(next).Append(FormatSeparator));
         PSOutputString = Strings.ToString();
     }
 
@@ -892,26 +895,28 @@ app.Map($"/{PwShUrl}/{{Wrapper}}", async (string Wrapper, HttpContext Context) =
     }
 );
 
-app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Script, HttpContext Context) =>
+app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}.{{Format}}", async (string Wrapper, string Script, string Format, HttpContext Context) =>
     {
         Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
         bool WrapperIsPublic = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().Count() == 0;
         bool WrapperPermission = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().Any(x => Context.User.IsInRole($"{x.Value}"));
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
-        
+
         if (!WrapperPermission && !WrapperIsPublic && !IsDevelopment) {
             if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.Forbidden;}
             await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
+        } else if (!FormatMap.ContainsKey(Format.ToLower())) {
+            await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"'{Format}' - is invalid format" }, jOptions);
         } else {
             ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
             string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
             string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
             string hostname = Context.Request.Host.ToString();
             
-            List<string> OutputFormats = new() {"json","text","html"};
-            string OutputFormat = Context.Request.Headers.Where(x => x.Key.ToLower() == "format" && OutputFormats.Contains($"{x.Value}".ToLower())).Select(x => $"{x.Value}".ToLower()).FirstOrDefault("json");
-            string q_format = Context.Request.Query.Where(x => x.Key.ToLower() == "__format__" && OutputFormats.Contains($"{x.Value}".ToLower())).Select(x => $"{x.Value}".ToLower()).FirstOrDefault("");
-            if (q_format.Length > 0 && OutputFormats.Contains(q_format)) { OutputFormat = q_format; }
+            // List<string> OutputFormats = new() {"json","text","html"};
+            // string OutputFormat = Context.Request.Headers.Where(x => x.Key.ToLower() == "format" && OutputFormats.Contains($"{x.Value}".ToLower())).Select(x => $"{x.Value}".ToLower()).FirstOrDefault("json");
+            // string q_format = Context.Request.Query.Where(x => x.Key.ToLower() == "__format__" && OutputFormats.Contains($"{x.Value}".ToLower())).Select(x => $"{x.Value}".ToLower()).FirstOrDefault("");
+            // if (q_format.Length > 0 && OutputFormats.Contains(q_format)) { OutputFormat = q_format; }
 
             if (!ScriptCache.ContainsKey(Wrapper)) {
                 if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.NotFound;}
@@ -933,12 +938,6 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Scri
                 bool success = true;
                 string error = "";
 
-                Dictionary<string,string> OutputFormatMap = new() {
-                    ["json"] = "application/json; charset=utf-8",
-                    ["text"] = "text/plain; charset=utf-8",
-                    ["html"] = "text/html; charset=utf-8",
-                };
-
                 if (Context.Request.HasJsonContentType()) {
                     try {
                         object _ = ConvertFromJson(Body,RaiseError:true);
@@ -947,16 +946,16 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Scri
                         error = "invalid JSON";
                     }
                 } else {
-                    if (Context.Request.HasFormContentType) {
-                        try {
-                            var ParsedForm = Context.Request.Form.ToDictionary(x => x.Key, x => x.Value.ToString());
-                            Body = ConvertToJson(ParsedForm, maxDepth:2, compressOutput:true);
+                    // if (Context.Request.HasFormContentType) {
+                    //     try {
+                    //         var ParsedForm = Context.Request.Form.ToDictionary(x => x.Key, x => x.Value.ToString());
+                    //         Body = ConvertToJson(ParsedForm, maxDepth:2, compressOutput:true);
 
-                        } catch {
-                            success = false;
-                            error = "invalid Form";
-                        }
-                    } else {
+                    //     } catch {
+                    //         success = false;
+                    //         error = "invalid Form";
+                    //     }
+                    // } else {
                         try {
                             var ParsedBody = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(Body).ToDictionary(x => x.Key, x => x.Value.ToString());
                             Body = ConvertToJson(ParsedBody, maxDepth:2, compressOutput:true);
@@ -964,12 +963,12 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}", async (string Wrapper, string Scri
                             success = false;
                             error = "invalid Body";
                         }
-                    }
+                    // }
                 }
 
                 if (success) {
-                    OutputString = PSScriptRunner(Wrapper, Script, Body, Context);
-                    Context.Response.Headers["Content-Type"] = OutputFormatMap[OutputFormat];
+                    OutputString = PSScriptRunner(Wrapper, Script, Body, Format, Context);
+                    Context.Response.Headers["Content-Type"] = FormatMap[Format];
                     await Context.Response.WriteAsync(OutputString);
                 } else {
                     if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.BadRequest;}
@@ -1191,6 +1190,12 @@ app.Map("/transcript/{id:int}", async (int id, HttpContext Context) =>
                 await Context.Response.WriteAsync(e.GetBaseException().Message);
             }
         }
+    }
+);
+
+app.Map("/test/{a}.{b}", async (string a, string b, HttpContext Context) =>
+    {
+        await Context.Response.WriteAsync($"a:{a},b:{b}");
     }
 );
 

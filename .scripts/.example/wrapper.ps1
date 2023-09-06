@@ -8,6 +8,7 @@ param(
     [Parameter(Mandatory=$true)][System.Object]$__USER__,
     [Parameter(Mandatory=$true)][System.Object]$__CONTEXT__,
     [Parameter(Mandatory=$false)][System.String]$__CONTENTTYPE__,
+    [Parameter(Mandatory=$false)][System.String]$__FORMAT__,
     [Parameter(Mandatory=$false)][System.String]$__TRANSCRIPT_FILE__
 )
 

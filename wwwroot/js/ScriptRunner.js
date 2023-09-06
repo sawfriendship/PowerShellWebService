@@ -141,7 +141,7 @@ function update_url() {
     var wrapper = $('#_wrapper').val()
     if (wrapper) {url = `${url}/${wrapper}`}
     var script = $('#_script').val()
-    if (script) {url = `${url}/${script}`}
+    if (script) {url = `${url}/${script}.json`}
     $('a#pwsh_url').prop('href',url)
     $('a#pwsh_url').html(url)
     console.log(url)
@@ -159,32 +159,21 @@ function send_body() {
     var outputtype = $('._outputtype').val()
     var wrapper = $('#_wrapper').val()
     var script = $('#_script').val()
-    var url = `/${PwShUrl}/${wrapper}/${script}`
+    var url = `/${PwShUrl}/${wrapper}/${script}.json`
     var request = {
         url: url,
         method: method,
         headers: {maxDepth:depth},
         success: function(responce){
+            t = responce
             $('._btn_send').removeClass('disabled')
             $('#_result').removeClass('processing')
             console.log(url,method,responce)
             if (outputtype == 'All') {
                 var result = responce
-            } else if (outputtype == 'Streams') {
-                var result = responce.Streams
-            } else if (outputtype == 'PSObjects') {
-                var result = responce.Streams.PSObjects
-            } else if (outputtype == 'Error') {
-                var result = responce.Streams.Error
-            } else if (outputtype == 'Warning') {
-                var result = responce.Streams.Warning
-            } else if (outputtype == 'Verbose') {
-                var result = responce.Streams.Verbose
-            } else if (outputtype == 'Information') {
-                var result = responce.Streams.Information
-            } else if (outputtype == 'Debug') {
-                var result = responce.Streams.Debug
-            } else {}
+            } else {
+                var result = responce.Streams[outputtype]
+            }
             var result_string = JSON.stringify(result, null, 2)
             $('#_result').val(result_string)
             if (!responce.Success || responce.Error || responce.Streams.HadErrors){
