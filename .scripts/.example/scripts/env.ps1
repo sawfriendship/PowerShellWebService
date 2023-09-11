@@ -8,29 +8,30 @@ $ls = ls -Path "env:\$Name" | select Name,Value
 if ($__FORMAT__ -eq 'json') {
     $ls
 } elseif ($__FORMAT__ -eq 'txt') {
-    $ls | Out-String
+    $ps | Out-String
 } elseif ($__FORMAT__ -eq 'csv') {
-    $ls | ConvertTo-Csv -Delimiter ';'
+    $ps | ConvertTo-Csv -Delimiter ';'
 } elseif ($__FORMAT__ -eq 'html') {
+
 @"
     <!DOCTYPE html>
     <html lang="en">
         <head>
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1">
+            <link rel="stylesheet" href="/wwwroot/lib/bootstrap/dist/css/bootstrap.min.css" />
+            <link rel="stylesheet" href="/wwwroot/lib/bootstrap/dist/css/bootstrap-icons.css" />
+            <link rel="stylesheet" href="/wwwroot/css/site.css" />
+            <script src="/wwwroot/lib/jquery/dist/jquery.min.js"></script>
+            <script src="/wwwroot/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+            <script src="/wwwroot/lib/j2ht/dist/j2ht.js"></script>
+            <link rel="icon" type="image/x-icon" href="/wwwroot/favicon.ico">
             <title>$__SCRIPTNAME__</title>
-            <link rel="stylesheet" href="/lib/bootstrap/dist/css/bootstrap.min.css" />
-            <link rel="stylesheet" href="/lib/bootstrap/dist/css/bootstrap-icons.css" />
-            <link rel="stylesheet" href="/css/site.css" />
-            <link rel="stylesheet" href="/PowerShellWebService.styles.css" />
-            <script src="/lib/jquery/dist/jquery.min.js"></script>
-            <script src="/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-            <script src="/lib/j2ht/dist/j2ht.js"></script>
         </head>
 
         <script>
             `$(document).ready(function() {
-                `$('main table').addClass('table')
+                `$('table').addClass('table')
             });
         </script>
 
@@ -51,18 +52,7 @@ if ($__FORMAT__ -eq 'json') {
                                 </div>
                             </form>
                             <br>
-                            1
-                            $($ls | ConvertTo-Html -Property Name,Value)
-                            2
-                            <table class="table">
-                                <thead>
-                                    <th>Name</th><th>Value</th>
-                                </thead>
-                                <tbody>
-                                    $($ls | % {"<tr><td>$($_.Name)</td><td>$($_.Value)</td></tr>"})
-                                </tbody>
-                            </table>
-
+                            $($ls | ConvertTo-Html -Fragment -Property Name,Value | Out-String)
                         </div>
                     </div>
                 </div>
