@@ -27,7 +27,6 @@ using Microsoft.PowerShell;
 using Microsoft.PowerShell.Commands;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.WebUtilities;
-
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
 
@@ -894,10 +893,10 @@ app.Map($"/{PwShUrl}/{{Wrapper}}", async (string Wrapper, HttpContext Context) =
 
 app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}.{{Format}}", async (string Wrapper, string Script, string Format, HttpContext Context) =>
     {
+        IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
         Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
         bool WrapperIsPublic = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().Count() == 0;
         bool WrapperPermission = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().Any(x => Context.User.IsInRole($"{x.Value}"));
-        IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
 
         if (!WrapperPermission && !WrapperIsPublic && !IsDevelopment) {
             if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.Forbidden;}
