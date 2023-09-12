@@ -12,15 +12,15 @@ param(
     [Parameter(Mandatory=$false)][System.String]$__TRANSCRIPT_FILE__
 )
 
-# Using checks
 # . $PSScriptRoot\middleware\checks.ps1
+. $PSScriptRoot\middleware\utils.ps1
 
 [hashtable]$__PARAMS__ = @{}
 
 $__QUERY__.GetEnumerator() | ForEach-Object {$__PARAMS__[$_.Key] = $_.Value}
 
 if ($__BODY__) {
-    ConvertFrom-Json -InputObject $__BODY__ -AsHashtable | ForEach-Object {$_.GetEnumerator()} | ForEach-Object {$__PARAMS__[$_.Key] = $_.Value}
+    ConvertFrom-Json -InputObject $__BODY__ -AsHashtable | Where-Object {$_.Key -notlike '__*__'} | ForEach-Object {$_.GetEnumerator()} | ForEach-Object {$__PARAMS__[$_.Key] = $_.Value}
 }
 
 # Write-Debug "__WRAPPER__:"

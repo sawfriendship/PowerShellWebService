@@ -875,8 +875,9 @@ app.Map($"/{PwShUrl}/", async (HttpContext Context) =>
 app.Map($"/{PwShUrl}/{{Wrapper}}", async (string Wrapper, HttpContext Context) =>
     {
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
+        bool WrapperIsPublic = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().Count() == 0;
         Console.WriteLine($"DateTime:'{DateTime.Now.ToString(DateTimeLogFormat)}', Path:'{Context.Request.Path}', QueryString:'{Context.Request.QueryString}', UserName:'{Context.User.Identity!.Name}'");
-        if (hasRole(Context) || IsDevelopment) {
+        if (hasRole(Context) || WrapperIsPublic || IsDevelopment) {
             List<string> Scripts = new();
             if (ScriptCache.ContainsKey(Wrapper)) {
                 Scripts = ScriptCache[Wrapper].Keys.ToList();
