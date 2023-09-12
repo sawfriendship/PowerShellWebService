@@ -12,7 +12,7 @@ if ($__FORMAT__ -eq 'json') {
 } elseif ($__FORMAT__ -eq 'csv') {
     $ps | ConvertTo-Csv -Delimiter ';'
 } elseif ($__FORMAT__ -eq 'prom') {
-    $ps | ConvertTo-Prom
+    $ps | ConvertTo-Prom -Name 'Process' -Help 'ps' -Type Gauge -Property Name -Value {$_.id}
 } elseif ($__FORMAT__ -eq 'html') {
 @"
     <!DOCTYPE html>
