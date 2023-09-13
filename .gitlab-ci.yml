@@ -1,27 +1,30 @@
 stages:
   - deploy
 
-deploy_to_repository:
+deploy_to_iis:
   stage: deploy
   only:
     - main
-  script: 
-   - chcp 65001
-   - whoami.exe
-   - New-Object -TypeName PSCustomObject -Property $PSVersionTable | ft PSVersion,PSEdition,OS
-   - (Get-Date).ToString('o')
-   - $Location = Get-Location
-   - dotnet.exe build
-   - Import-Module WebAdministration -WarningAction:SilentlyContinue
-   - Get-WebSite -Name 'PowerShellWebService' | ft Id,Name,State,Bindings
-   - Write-Host $Location -ForegroundColor Yellow
-   - "#Get-ChildItem -Path $Location -Recurse | % {$_.FullName.replace($Location,'')}"
-   - Get-ChildItem -Path $Location -Recurse | Group-Object -Property Directory | Select-Object -Property @{n='Directory';e={$_.Name.replace($Location,'')}},Count
-   - Stop-WebSite -Name 'PowerShellWebService' -Passthru | ft Id,Name,State,Bindings
-   - Stop-WebAppPool -Name 'PowerShellWebService' -Passthru | ft Name,State
-   - try {Copy-Item -Force -Recurse -Path "$Location\bin\Debug\net7.0-windows\*" -Destination 'C:\inetpub\PowerShellWebService\' -Exclude 'appsettings.json'} catch {Write-Warning $_.Exception}
-   - Start-WebAppPool -Name 'PowerShellWebService' -Passthru | ft Name,State
-   - Start-WebSite -Name 'PowerShellWebService' -Passthru | ft Id,Name,State,Bindings
-   - (Get-Date).ToString('o')
+  script: |
+    $WEB_SITE = 'PowerShellWebService'
+    $APP_POOL = 'PowerShellWebService'
+    $APP_PATH = 'C:\inetpub\PowerShellWebService\'
+    whoami.exe
+    New-Object -TypeName PSCustomObject -Property $PSVersionTable | ft PSVersion,PSEdition,OS
+    (Get-Date).ToString('o')
+    $Location = Get-Location
+    dotnet.exe build
+    Import-Module WebAdministration -WarningAction:SilentlyContinue
+    Get-WebSite -Name $WEB_SITE | ft Id,Name,State
+    Write-Host $Location -ForegroundColor Yellow
+    "#Get-ChildItem -Path $Location -Recurse | % {$_.FullName.replace($Location,'')}"
+    Get-ChildItem -Path $Location -Recurse | Group-Object -Property Directory | Select-Object -Property @{n='Directory';e={$_.Name.replace($Location,'')}},Count
+    Stop-WebSite -Name $WEB_SITE -Passthru | ft Id,Name,State
+    Stop-WebAppPool -Name $APP_POOL -Passthru | ft Name,State
+    try {Copy-Item -Force -Recurse -Path "$Location\wwwroot\*" -Destination $APP_PATH} catch {Write-Warning $_.Exception}
+    try {Copy-Item -Force -Recurse -Path "$Location\bin\Debug\net7.0-windows\*" -Destination $APP_PATH -Exclude @('appsettings.json','web.config')} catch {Write-Warning $_.Exception}
+    Start-WebAppPool -Name $APP_POOL -Passthru | ft Name,State
+    Start-WebSite -Name $WEB_SITE -Passthru | ft Id,Name,State
+    (Get-Date).ToString('o')
   tags: 
     - APP

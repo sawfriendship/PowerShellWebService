@@ -8,9 +8,9 @@ $ls = ls -Path "env:\$Name" | select Name,Value
 if ($__FORMAT__ -eq 'json') {
     $ls
 } elseif ($__FORMAT__ -eq 'txt') {
-    $ps | Out-String
+    $ls | Out-String
 } elseif ($__FORMAT__ -eq 'csv') {
-    $ps | ConvertTo-Csv -Delimiter ';'
+    $ls | ConvertTo-Csv -Delimiter ';'
 } elseif ($__FORMAT__ -eq 'html') {
 
 @"

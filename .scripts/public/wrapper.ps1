@@ -12,16 +12,26 @@ param(
     [Parameter(Mandatory=$false)][System.String]$__TRANSCRIPT_FILE__
 )
 
+$__ACTION_PARAMS__ = [System.Web.HttpUtility]::ParseQueryString('')
+
 # . $PSScriptRoot\middleware\checks.ps1
 . $PSScriptRoot\middleware\utils.ps1
 
 [hashtable]$__PARAMS__ = @{}
 
-$__QUERY__.GetEnumerator() | ForEach-Object {$__PARAMS__[$_.Key] = $_.Value}
+$__QUERY__.GetEnumerator() | ForEach-Object {
+    $__PARAMS__[$_.Key] = $_.Value
+    $__ACTION_PARAMS__[$_.Key] = $_.Value
+}
 
 if ($__BODY__) {
-    ConvertFrom-Json -InputObject $__BODY__ -AsHashtable | Where-Object {$_.Key -notlike '__*__'} | ForEach-Object {$_.GetEnumerator()} | ForEach-Object {$__PARAMS__[$_.Key] = $_.Value}
+    ConvertFrom-Json -InputObject $__BODY__ -AsHashtable | Where-Object {$_.Key -notlike '__*__'} | ForEach-Object {$_.GetEnumerator()} | ForEach-Object {
+        $__PARAMS__[$_.Key] = $_.Value
+        $__ACTION_PARAMS__[$_.Key] = $_.Value
+    }
 }
+
+$__ACTION_PATH__ = "$($__CONTEXT__.Request.Path)?$($__ACTION_PARAMS__.ToString())"
 
 # Write-Debug "__WRAPPER__:"
 # Write-Debug "PSBoundParameters: $(ConvertTo-Json $PSBoundParameters)"

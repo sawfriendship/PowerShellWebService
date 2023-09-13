@@ -43,23 +43,25 @@ if ($__FORMAT__ -eq 'json') {
 
             <main role="main">
                 <div class="container">
-                    <div class="row row-cols-2">
-                        <div id="LEFT" class="col-xs-12 col-sm-12 col-md-8 col-lg-4 col-xl-4 col-xxl-4" style="z-index:2">
-                            <form action="$($__CONTEXT__.Request.Path)$($__CONTEXT__.Request.QueryString)" method="POST">
+
+                        <div id="LEFT" class="w-100">
+                            <form action="$__ACTION_PATH__" method="POST">
                                 <div class="input-group input-group-sm w-100">
                                     <label for="Name" class="form-label w-25">Wrapper</label>
                                     <input id="Name" name="Name" class="form-control w-50" value="$Name">
-                                    </div>
-                                    <div class="input-group input-group-sm w-100">
+                                </div>
+                                <div class="input-group input-group-sm w-100">
                                     <label for="Limit" class="form-label w-25">Limit</label>
                                     <input id="Limit" name="Limit" class="form-control w-50" value="$Limit">
                                 </div>
                                 <input type="submit" class="btn btn-outline-dark w-25" value="Post!" />
                             </form>
                             <br>
+                            $__ACTION_PATH__
+                            <br>
                             $($ps | ConvertTo-Html -Fragment -Property id,name | Out-String)
                         </div>
-                    </div>
+
                 </div>
             </main>
                                     
