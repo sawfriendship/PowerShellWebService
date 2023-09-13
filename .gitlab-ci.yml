@@ -21,9 +21,9 @@ deploy_to_iis:
     Get-ChildItem -Path $Location -Recurse | Group-Object -Property Directory | Select-Object -Property @{n='Directory';e={$_.Name.replace($Location,'')}},Count
     Stop-WebSite -Name $WEB_SITE -Passthru | ft Id,Name,State
     Stop-WebAppPool -Name $APP_POOL -Passthru | ft Name,State
-    try {Copy-Item -Force -Recurse -Path "$Location\bin\Debug\net7.0-windows" -Destination "$APP_PATH\" -Exclude @('appsettings.json','web.config')} catch {Write-Warning $_.Exception}
-    try {Copy-Item -Force -Recurse -Path "$Location\wwwroot" -Destination "$APP_PATH\wwwroot"} catch {Write-Warning $_.Exception}
-    try {Copy-Item -Force -Recurse -Path "$Location\.scripts" -Destination "$APP_PATH\.scripts"} catch {Write-Warning $_.Exception}
+    try {Copy-Item -Force -Recurse -Path "$Location\bin\Debug\net7.0-windows\*" -Destination "$APP_PATH\" -Exclude @('appsettings.json','web.config')} catch {Write-Warning $_.Exception}
+    try {Copy-Item -Force -Recurse -Path "$Location\wwwroot\*" -Destination "$APP_PATH\wwwroot"} catch {Write-Warning $_.Exception}
+    try {Copy-Item -Force -Recurse -Path "$Location\.scripts\*" -Destination "$APP_PATH\.scripts"} catch {Write-Warning $_.Exception}
     Start-WebAppPool -Name $APP_POOL -Passthru | ft Name,State
     Start-WebSite -Name $WEB_SITE -Passthru | ft Id,Name,State
     (Get-Date).ToString('o')
