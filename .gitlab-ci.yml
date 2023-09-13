@@ -8,7 +8,7 @@ deploy_to_iis:
   script: |
     $WEB_SITE = 'PowerShellWebService'
     $APP_POOL = 'PowerShellWebService'
-    $APP_PATH = 'C:\inetpub\PowerShellWebService\'
+    $APP_PATH = 'C:\inetpub\PowerShellWebService'
     whoami.exe
     New-Object -TypeName PSCustomObject -Property $PSVersionTable | ft PSVersion,PSEdition,OS
     (Get-Date).ToString('o')
