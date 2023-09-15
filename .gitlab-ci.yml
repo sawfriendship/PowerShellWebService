@@ -7,7 +7,6 @@ execute_app:
   only:
     - main
   script: |
-    chcp 65001
     $WEB_SITE = 'PowerShellWebService'
     $APP_POOL = 'PowerShellWebService'
     $APP_PATH = 'C:\inetpub\PowerShellWebService'
