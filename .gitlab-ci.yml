@@ -13,6 +13,7 @@ execute_app:
     $LOCATION = Get-Location
     "OS = $env:OS, ENV_TEST_VAR1 = $env:ENV_TEST_VAR1"
     "OS = $OS, ENV_TEST_VAR1 = $ENV_TEST_VAR1"
+    chcp 65001
     chcp
 
     dotnet.exe build
