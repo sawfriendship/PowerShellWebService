@@ -11,7 +11,8 @@ execute_app:
     $APP_POOL = 'PowerShellWebService'
     $APP_PATH = 'C:\inetpub\PowerShellWebService'
     $LOCATION = Get-Location
-    $ps = Start-Process dotnet -ArgumentList @('run',"$LOCATION\PowerShellWebService.csproj") -PassThru
+    $ps = Start-Process dotnet -ArgumentList run,.\PowerShellWebService.csproj -PassThru
+    sleep 5
     $r = Invoke-RestMethod -Uri 'http://localhost:5166/config/check'
     if (!$r.Success) {throw}
     $ps | kill -f -pass
