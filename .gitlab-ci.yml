@@ -16,9 +16,8 @@ execute_app:
     "OS = $env:OS, ENV_TEST_VAR1 = $ENV_TEST_VAR1"
 
     dotnet.exe build
-    $ps = Start-Process -PSPath "$LOCATION\bin\Debug\net7.0-windows\PowerShellWebService.exe" -PassThru
-    $ps
-
+    Start-Process -PSPath "$LOCATION\bin\Debug\net7.0-windows\PowerShellWebService.exe" -NoNewWindow
+    
     sleep 20
     $r = Invoke-RestMethod -Uri 'http://localhost:5166/config/check'
     $r
