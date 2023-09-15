@@ -14,12 +14,12 @@ execute_app:
     "OS = $env:OS, ENV_TEST_VAR1 = $env:ENV_TEST_VAR1"
     "OS = $OS, ENV_TEST_VAR1 = $ENV_TEST_VAR1"
     chcp
-    
+
     dotnet.exe build
     $ps = Start-Process -PSPath "$LOCATION\bin\Debug\net7.0-windows\PowerShellWebService.exe" -PassThru
     $ps
 
-    sleep 15
+    sleep 10
     $r = Invoke-RestMethod -Uri 'http://localhost:5166/config/check'
     $r
     if (!$r.Success) {throw}
