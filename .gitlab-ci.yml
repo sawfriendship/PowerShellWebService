@@ -16,6 +16,7 @@ execute_app:
     "OS = $env:OS, ENV_TEST_VAR1 = $ENV_TEST_VAR1"
 
     dotnet.exe build
+    try {Copy-Item -Force -Recurse -Path "$LOCATION\wwwroot\*" -Destination "$APP_PATH\wwwroot"} catch {Write-Warning $_.Exception}
     Start-Process -PSPath "$LOCATION\bin\Debug\net7.0-windows\PowerShellWebService.exe" -NoNewWindow
     
     sleep 20
