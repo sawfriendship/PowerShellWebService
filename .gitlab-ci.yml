@@ -11,6 +11,7 @@ execute_app:
     $APP_POOL = 'PowerShellWebService'
     $APP_PATH = 'C:\inetpub\PowerShellWebService'
     $LOCATION = Get-Location
+    "OS = $env:OS, ENV_TEST_VAR1 = $env:ENV_TEST_VAR1"
     dotnet.exe build
     $ps = Start-Process -PSPath "$LOCATION\bin\Debug\net7.0-windows\PowerShellWebService.exe" -PassThru
     $ps
