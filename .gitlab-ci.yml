@@ -16,7 +16,7 @@ execute_app:
     $ps = Start-Process -PSPath "$LOCATION\bin\Debug\net7.0-windows\PowerShellWebService.exe" -PassThru
     $ps
 
-    sleep 5
+    sleep 15
     $r = Invoke-RestMethod -Uri 'http://localhost:5166/config/check'
     $r
     if (!$r.Success) {throw}
