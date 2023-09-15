@@ -14,6 +14,7 @@ execute_app:
     "OS = $env:OS, ENV_TEST_VAR1 = $env:ENV_TEST_VAR1"
     "OS = $OS, ENV_TEST_VAR1 = $ENV_TEST_VAR1"
     chcp
+    
     dotnet.exe build
     $ps = Start-Process -PSPath "$LOCATION\bin\Debug\net7.0-windows\PowerShellWebService.exe" -PassThru
     $ps
