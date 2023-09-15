@@ -12,13 +12,13 @@ execute_app:
     $APP_POOL = 'PowerShellWebService'
     $APP_PATH = 'C:\inetpub\PowerShellWebService'
     $LOCATION = Get-Location
+    dotnet.exe build
     $ps = Start-Process -PSPath "$LOCATION\bin\Debug\net7.0-windows\PowerShellWebService.exe" -PassThru
     $ps
     sleep 5
     $ps | kill -f -pass
     (Get-Date).ToString('o')
     New-Object -TypeName PSCustomObject -Property $PSVersionTable | ft PSVersion,PSEdition,OS
-    dotnet.exe build
     
     (Get-Date).ToString('o')
   tags: 
