@@ -7,14 +7,13 @@ execute_app:
   only:
     - main
   script: |
-    chcp 65001
     $WEB_SITE = 'PowerShellWebService'
     $APP_POOL = 'PowerShellWebService'
     $APP_PATH = 'C:\inetpub\PowerShellWebService'
     $LOCATION = Get-Location
-    $ps = Start-Process -PSPath "$LOCATION\bin\Debug\net7.0-windows\PowerShellWebService.exe" -PassThru
-    $ps
-    sleep 5
+    $ps = Start-Process dotnet -ArgumentList @('run',"$LOCATION\PowerShellWebService.csproj") -PassThru
+    $r = Invoke-RestMethod -Uri 'http://localhost:5166/config/check'
+    if (!$r.Success) {throw}
     $ps | kill -f -pass
     (Get-Date).ToString('o')
     New-Object -TypeName PSCustomObject -Property $PSVersionTable | ft PSVersion,PSEdition,OS
