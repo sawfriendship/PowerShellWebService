@@ -457,12 +457,12 @@ void SqlTableCreate(string ConnectionString, string Table) {
         CREATE TABLE {Table} (
             [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED,
             [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [PID] int NULL,
-            [UserName] [nvarchar](64) NULL DEFAULT '-', [IPAddress] [nvarchar](64) NULL DEFAULT '-', [ContentType] [nvarchar](128) NULL DEFAULT '-', [Method] [nvarchar](16) NULL DEFAULT '-',
-            [Wrapper] [nvarchar](256) NULL DEFAULT '-', [Script] [nvarchar](256) NULL DEFAULT '-',
+            [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [ContentType] [nvarchar](128) NULL, [Method] [nvarchar](16) NULL,
+            [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL,
             [Headers] [text] NULL DEFAULT '{{}}', [Query] [text] NULL DEFAULT '{{}}', [Body] [text] NULL DEFAULT '{{}}',
-            [Error] [text] NULL DEFAULT '-', [Success] [bit] NULL DEFAULT 0, [HadErrors] [bit] NULL DEFAULT 1,
+            [Error] [text] NULL, [Success] [bit] NULL DEFAULT 0, [HadErrors] [bit] NULL DEFAULT 1,
             [PSObjects] [text] NULL DEFAULT '[]', [StreamError] [text] NULL DEFAULT '[]', [StreamWarning] [text] NULL DEFAULT '[]', [StreamInformation] [text] NULL DEFAULT '[]', [StreamVerbose] [text] NULL DEFAULT '[]',
-            [TranscriptPath] [nvarchar](512) NULL
+            [TranscriptFile] [nvarchar](512) NULL
         )
     ";
     var connection = new System.Data.SqlClient.SqlConnection(SqlConnectionString);

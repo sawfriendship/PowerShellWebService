@@ -12,10 +12,12 @@ param(
     [Parameter(Mandatory=$false)][System.String]$__TRANSCRIPT_FILE__
 )
 
-$__ACTION_PARAMS__ = [System.Web.HttpUtility]::ParseQueryString('')
+$null = Start-Transcript -Path $__TRANSCRIPT_FILE__ -Force
 
-# . $PSScriptRoot\middleware\checks.ps1
+. $PSScriptRoot\middleware\init.ps1
 . $PSScriptRoot\middleware\utils.ps1
+
+$__ACTION_PARAMS__ = [System.Web.HttpUtility]::ParseQueryString('')
 
 [hashtable]$__PARAMS__ = @{}
 
@@ -33,12 +35,11 @@ if ($__BODY__) {
 
 $__ACTION_PATH__ = "$($__CONTEXT__.Request.Path)?$($__ACTION_PARAMS__.ToString())"
 
-# Write-Debug "__WRAPPER__:"
-# Write-Debug "PSBoundParameters: $(ConvertTo-Json $PSBoundParameters)"
-# Write-Debug "__SCRIPT__"
-# Write-Debug "__PARAMS__: $(ConvertTo-Json $__PARAMS__)"
+Write-Debug "__WRAPPER__: $__WRAPPER__"
+Write-Debug "__SCRIPTNAME__: $__SCRIPTNAME__"
+Write-Debug "__QUERY__: $(ConvertTo-Json $__QUERY__)"
+Write-Debug "__BODY__: $(ConvertTo-Json $__BODY__)"
 
-$null = Start-Transcript -Path $__TRANSCRIPT_FILE__ -Force
 
 # Using global var, that configured in CachedVariables section of config.json file
 if (!$Global:StartUp) {$Global:StartUp = Get-Date}
