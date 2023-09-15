@@ -7,14 +7,13 @@ execute_app:
   only:
     - main
   script: |
+    chcp 65001
+    Start-Transcript -Path $PSScriptRoot\log.txt -Force
     $WEB_SITE = 'PowerShellWebService'
     $APP_POOL = 'PowerShellWebService'
     $APP_PATH = 'C:\inetpub\PowerShellWebService'
     $LOCATION = Get-Location
-    "OS = $env:OS, ENV_TEST_VAR1 = $env:ENV_TEST_VAR1"
-    "OS = $OS, ENV_TEST_VAR1 = $ENV_TEST_VAR1"
-    chcp 65001
-    chcp
+    "OS = $env:OS, ENV_TEST_VAR1 = $ENV_TEST_VAR1"
 
     dotnet.exe build
     $ps = Start-Process -PSPath "$LOCATION\bin\Debug\net7.0-windows\PowerShellWebService.exe" -PassThru
@@ -38,6 +37,7 @@ deploy_to_iis:
   only:
     - main
   script: |
+    chcp 65001
     $WEB_SITE = 'PowerShellWebService'
     $APP_POOL = 'PowerShellWebService'
     $APP_PATH = 'C:\inetpub\PowerShellWebService'
