@@ -8,11 +8,11 @@ execute_app:
     - main
   script: |
     chcp 65001
-    Start-Transcript -Path $PSScriptRoot\log.txt -Force
     $WEB_SITE = 'PowerShellWebService'
     $APP_POOL = 'PowerShellWebService'
     $APP_PATH = 'C:\inetpub\PowerShellWebService'
     $LOCATION = Get-Location
+    Start-Transcript -Path $LOCATION\log.txt -Force
     "OS = $env:OS, ENV_TEST_VAR1 = $ENV_TEST_VAR1"
 
     dotnet.exe build
