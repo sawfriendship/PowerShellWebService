@@ -160,7 +160,7 @@ function send_body() {
     var wrapper = $('#_wrapper').val()
     var script = $('#_script').val()
     var url = `/${PwShUrl}/${wrapper}/${script}.json`
-    var request = {
+    var request_param = {
         url: url,
         method: method,
         headers: {maxDepth:depth},
@@ -188,18 +188,21 @@ function send_body() {
             $('#_result').removeClass('processing')
             $('#_result').removeClass('border-success _result_success').addClass('border-danger _result_error')
             ani_send(200);
+        },
+        complete: function(xhr, textStatus) {
+            if (xhr.status == 200) {var responce_color = 'green'} else {var responce_color = 'red'}
+            $('.StatusCode').html(`<span>${xhr.status}</span>`).css({color:responce_color})
         }
     }
 
-    if (method == 'POST') {
+    if (method != 'GET') {
         var j_string = $('#_body').val()
-        if (j_string) {
-            request['data'] = j_string
-        }
-        request['contentType'] = 'application/json; charset=utf-8'
+        if (j_string) {request_param['data'] = j_string}
+        request_param['contentType'] = 'application/json; charset=utf-8'
     }
 
-    $.ajax(request);
+    $.ajax(request_param);
+    
 }
 
 function write_to_clip() {navigator.clipboard.writeText($('#_result').val())}
