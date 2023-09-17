@@ -149,11 +149,6 @@ function update_url() {
 
 function send_body() {
     var PwShUrl = $('#conf input[name=PwShUrl]').val();
-    $('._btn_send').addClass('disabled')
-    $('#_result').addClass('processing')
-    $('#_result').removeClass('border-success _result_success border-danger _result_error')
-    $('#_result ').val('...')
-    ani_send(200);
     var method = $(this).attr('method')
     var depth = $('._depth').val()
     var outputtype = $('._outputtype').val()
@@ -164,11 +159,14 @@ function send_body() {
         url: url,
         method: method,
         headers: {maxDepth:depth},
+        beforeSend: function(responce){
+            $('._btn_send').addClass('disabled')
+            $('#_result').addClass('processing')
+            $('#_result').removeClass('border-success _result_success border-danger _result_error')
+            $('#_result ').val('...')
+            ani_send(200);
+        },
         success: function(responce){
-            t = responce
-            $('._btn_send').removeClass('disabled')
-            $('#_result').removeClass('processing')
-            console.log(url,method,responce)
             if (outputtype == 'All') {
                 var result = responce
             } else {
@@ -181,15 +179,14 @@ function send_body() {
             } else {
                 $('#_result').removeClass('border-danger _result_error').addClass('border-success _result_success')
             }
-            ani_send(200);
         },
         error: function(responce){
-            $('._btn_send').removeClass('disabled')
-            $('#_result').removeClass('processing')
             $('#_result').removeClass('border-success _result_success').addClass('border-danger _result_error')
-            ani_send(200);
         },
         complete: function(xhr, textStatus) {
+            $('._btn_send').removeClass('disabled')
+            $('#_result').removeClass('processing')
+            ani_send(200);
             if (xhr.status == 200) {var responce_color = 'green'} else {var responce_color = 'red'}
             $('.StatusCode').html(`<span>${xhr.status}</span>`).css({color:responce_color})
         }
