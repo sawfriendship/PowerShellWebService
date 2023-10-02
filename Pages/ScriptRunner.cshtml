@@ -120,9 +120,10 @@
                     <button class="btn btn-outline-dark _btn_send" method="PATCH" type="button">PATCH</button>
                     <button class="btn btn-outline-dark _btn_send" method="PUT" type="button">PUT</button>
                     <button class="btn btn-outline-dark _btn_send" method="DELETE" type="button">DELETE</button>
+                    <button class="btn btn-outline-dark _btn_send" method="DEBUG" type="button">DEBUG</button>
                 </div>
 
-                    <br>
+                <br>
                 <label for="_result" class="form-label">Result <span class="StatusCode"></span></label>
                 <div id="Result" class="">
                     <textarea id="_result" class="form-control bg-dark text-light border border-4 rounded rounded-5" rows="20" placeholder="Result" readonly></textarea>
@@ -134,5 +135,7 @@
     </div>
 
 }
+
+<div class="toast-container position-static"></div>
 
 <script src="/wwwroot/js/ScriptRunner.js" asp-append-version="true"></script>

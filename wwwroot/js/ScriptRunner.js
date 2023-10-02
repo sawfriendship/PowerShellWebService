@@ -188,7 +188,7 @@ function send_body() {
             $('#_result').removeClass('processing')
             ani_send(200);
             if (xhr.status == 200) {var responce_color = 'green'} else {var responce_color = 'red'}
-            $('.StatusCode').html(`<span>${xhr.status}</span>`).css({color:responce_color})
+            $('.StatusCode').html(`<b>${xhr.status}</b>`).css({color:responce_color})
         }
     }
 
