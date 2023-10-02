@@ -810,6 +810,29 @@ app.Map("/whoami", async (HttpContext Context) =>
     }
 );
 
+app.Map("/token", async (HttpContext Context) =>
+    {
+        Dictionary<String, object> Result = new()
+        {
+            ["Success"] = true,
+            ["Error"] = "",
+            ["Token"] = "",
+        };
+
+        if (Context.User.Identity!.AuthenticationType is not null && Context.User.Identity!.AuthenticationType.ToString().ToLower() == "basic") {
+            string Token = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization").Select(x => $"{x.Value}").FirstOrDefault("");
+            if (Token.Length > 0) {
+                Result["Token"] = Token;
+            }
+        } else {
+            Result["Success"] = false;
+            Result["Error"] = "The authentication type must be basic";
+        }
+
+        await Context.Response.WriteAsJsonAsync(Result);
+    }
+);
+
 app.Map("/logout", async (HttpContext Context) =>
     {   
         long dt = DateTime.Now.ToFileTime();
