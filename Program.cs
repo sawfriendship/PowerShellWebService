@@ -69,15 +69,15 @@ if (PSModulePath.Count > 0) {
 string ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
 string PwShUrl = app.Configuration.GetValue("PwShUrl", "PowerShell")!;
 string UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
-string SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
-string SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
+string SqlConnectionString = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:ConnectionString", "")!);
+string SqlTable = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:Table", "Log")!);
 bool SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
 bool AbortScriptOnSqlFailure = app.Configuration.GetValue("SqlLogging:AbortScriptOnFailure", true);
 bool Always200 = app.Configuration.GetValue("Always200", true);
+var PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren();
 var ScriptCache = new Dictionary<string, Dictionary<string, Dictionary<string, object>>>();
-var CachedVariables = app.Configuration.GetSection("CachedVariables").GetChildren().ToArray().Select(x => $"{x.Value}").ToList();
-var PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren().ToList();
 var jOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = false , MaxDepth = 5, WriteIndented = true};
+List<string> CachedVariables = app.Configuration.GetSection("CachedVariables").GetChildren().Select(x => Environment.ExpandEnvironmentVariables($"{x.Value}")).ToList();
 Dictionary<string,Dictionary<string,string>> FormatMap = app.Configuration.GetSection("FormatMapping").GetChildren().
     ToDictionary(x => x.Key, x => new Dictionary<string, string>() {["type"] = $"{x["type"]}", ["separator"] = $"{x["separator"]}"});
 
@@ -87,7 +87,7 @@ ScriptLoader();
 
 string PSScriptRunner(string Wrapper, string Script, string Body, string Format, HttpContext Context) {
     ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
-    PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren().ToList();
+    PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren();
     UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
     System.Text.RegularExpressions.Regex __Keys__ = new Regex(@"^__.+__$", RegexOptions.IgnoreCase);
     Dictionary<string, string> Query = Context.Request.Query.Where(x => !__Keys__.IsMatch(x.Key)).ToDictionary(x => x.Key, x => $"{x.Value}");
@@ -127,7 +127,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
     string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
     SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
 
-    string TranscriptPath = app.Configuration.GetValue("TranscriptPath", ScriptRoot)!;
+    string TranscriptPath = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("TranscriptPath", ScriptRoot)!);
     string TranscriptFullPath = Path.GetFullPath(TranscriptPath);
     string DateStr = DateTime.Now.ToString("yyyy-MM-dd");
     string TimeStr = DateTime.Now.ToString("HH-mm-ss-ffffff");
@@ -136,10 +136,10 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
 
     if (SqlLoggingEnabled) {
         AbortScriptOnSqlFailure = app.Configuration.GetValue("SqlLogging:AbortScriptOnFailure", true);
-        SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
+        SqlConnectionString = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:ConnectionString", "")!);
 
-        if (SqlTable != app.Configuration.GetValue("SqlLogging:Table", "Log")) {
-            SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
+        if (SqlTable != Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:Table", "Log")!)) {
+            SqlTable = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:Table", "Log")!);
             SqlTableCreate(SqlConnectionString, SqlTable);
             Console.WriteLine($"{DateTime.Now.ToString(DateTimeLogFormat)}, SQL TABLE CHANGED!");
         }
@@ -991,8 +991,8 @@ app.MapPost("/log", async (HttpContext Context) =>
         Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
         
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
-        SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
-        SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
+        SqlTable = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:Table", "Log")!);
+        SqlConnectionString = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:ConnectionString", "")!);
 
         Dictionary<string,string> Query = Context.Request.Query.ToDictionary(x => x.Key.ToString().ToLower(), x => x.Value.ToString());
 
@@ -1070,8 +1070,8 @@ app.MapPost("/log", async (HttpContext Context) =>
 app.MapGet("/log/{id:int}", async (int id, HttpContext Context) =>
     {
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
-        SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
-        SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
+        SqlTable = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:Table", "Log")!);
+        SqlConnectionString = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:ConnectionString", "")!);
 
         List<Dictionary<string,dynamic>> Filters = new(){
             new Dictionary<string,dynamic>() {
@@ -1132,8 +1132,8 @@ app.Map("/transcript/{id:int}", async (int id, HttpContext Context) =>
         List<Dictionary<string,object>> data = new();
 
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
-        SqlTable = app.Configuration.GetValue("SqlLogging:Table", "Log")!;
-        SqlConnectionString = app.Configuration.GetValue("SqlLogging:ConnectionString", "")!;
+        SqlTable = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:Table", "Log")!);
+        SqlConnectionString = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:ConnectionString", "")!);
 
         List<Dictionary<string,dynamic>> Filters = new(){
             new Dictionary<string,dynamic>() {
@@ -1160,7 +1160,7 @@ app.Map("/transcript/{id:int}", async (int id, HttpContext Context) =>
                     );
                 }
                 var row = data.First();
-                string TranscriptPath = app.Configuration.GetValue("TranscriptPath", ScriptRoot)!;
+                string TranscriptPath = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("TranscriptPath", ScriptRoot)!);
                 string TranscriptFile = Path.Join(TranscriptPath,row["TranscriptFile"].ToString()!);
                 var TranscriptFileContent = File.ReadAllText(TranscriptFile);
                 await Context.Response.WriteAsync(TranscriptFileContent);
