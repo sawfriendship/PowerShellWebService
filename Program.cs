@@ -37,8 +37,7 @@ WebAppBuilder.Services.AddRazorPages();
 WebAppBuilder.Logging.AddJsonConsole();
 WebAppBuilder.Configuration.
     AddJsonFile("appsettings.json", optional: false, reloadOnChange: true).
-    AddJsonFile($"appsettings.{ASPNETCORE_ENVIRONMENT}.json", optional: true, reloadOnChange: true).
-    AddEnvironmentVariables();
+    AddJsonFile($"appsettings.{ASPNETCORE_ENVIRONMENT}.json", optional: true, reloadOnChange: true);
 
 await using var app = WebAppBuilder.Build();
 
