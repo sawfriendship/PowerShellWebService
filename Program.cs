@@ -16,7 +16,6 @@ using System.Security;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Linq;
-// using System.Reflection;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using Microsoft.Extensions.Configuration;
@@ -68,6 +67,7 @@ if (PSModulePath.Count > 0) {
 
 
 string ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
+string IPAddressHeader = app.Configuration.GetValue("SqlLogging:IPAddressHeader", "")!;
 string PwShUrl = app.Configuration.GetValue("PwShUrl", "PowerShell")!;
 string UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
 string SqlConnectionString = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:ConnectionString", "")!);
@@ -95,6 +95,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
     Dictionary<string, string> Query = Context.Request.Query.Where(x => !__Keys__.IsMatch(x.Key)).ToDictionary(x => x.Key, x => $"{x.Value}");
     Dictionary<string, string> Headers = Context.Request.Headers.Where(x => !__Keys__.IsMatch(x.Key)).ToDictionary(x => x.Key, x => $"{x.Value}");
     string AuthorizationHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization").Select(x => x.Key).FirstOrDefault("");
+    string LogIPAddress = Context.Request.Headers.Where(x => IPAddressHeader.Length > 0 && x.Key.ToLower() == IPAddressHeader.ToLower()).Select(x => x.Value).FirstOrDefault($"{Context.Connection.RemoteIpAddress}")!;
     string ContentType = $"{Context.Request.ContentType}";
     if (Headers.ContainsKey(AuthorizationHeader)) { Headers[AuthorizationHeader] = $"{Context.User.Identity!.AuthenticationType} ***"; }
 
@@ -150,11 +151,12 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
         Dictionary<string,object> SqlLogParam = new()
         {
             ["PID"] = Process.GetCurrentProcess().Id,
-            ["IPAddress"] = $"{Context.Connection.RemoteIpAddress}",
+            ["IPAddress"] = LogIPAddress,
             ["Method"] = Context.Request.Method,
             ["ContentType"] = ContentType,
             ["Wrapper"] = Wrapper,
             ["Script"] = Script,
+            ["Format"] = Format,
             ["TranscriptFile"] = TranscriptFile,
         };
 
@@ -461,7 +463,7 @@ void SqlTableCreate(string ConnectionString, string Table) {
             [id] [bigint] IDENTITY(1,1) NOT NULL PRIMARY KEY CLUSTERED,
             [BeginDate] [datetime] NOT NULL DEFAULT (GETDATE()), [EndDate] [datetime] NULL, [PID] int NULL,
             [UserName] [nvarchar](64) NULL, [IPAddress] [nvarchar](64) NULL, [ContentType] [nvarchar](128) NULL, [Method] [nvarchar](16) NULL,
-            [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL,
+            [Wrapper] [nvarchar](256) NULL, [Script] [nvarchar](256) NULL, [Format] [nvarchar](32) NULL,
             [Headers] [text] NULL DEFAULT '{{}}', [Query] [text] NULL DEFAULT '{{}}', [Body] [text] NULL DEFAULT '{{}}',
             [Error] [text] NULL, [Success] [bit] NULL DEFAULT 0, [HadErrors] [bit] NULL DEFAULT 1,
             [PSObjects] [text] NULL DEFAULT '[]', [StreamError] [text] NULL DEFAULT '[]', [StreamWarning] [text] NULL DEFAULT '[]', [StreamInformation] [text] NULL DEFAULT '[]', [StreamVerbose] [text] NULL DEFAULT '[]',
