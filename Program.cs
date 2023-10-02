@@ -66,12 +66,14 @@ if (PSModulePath.Count > 0) {
     System.Environment.SetEnvironmentVariable("PSModulePath",PSModulePathStr);
 }
 
+
 string ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
 string PwShUrl = app.Configuration.GetValue("PwShUrl", "PowerShell")!;
 string UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
 string SqlConnectionString = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:ConnectionString", "")!);
 string SqlTable = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:Table", "Log")!);
 bool SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
+List<string> SqlLoggedWrappers = app.Configuration.GetSection("SqlLogging:Wrappers").GetChildren().Select(x => $"{x.Value}".ToLower()).ToList();
 bool AbortScriptOnSqlFailure = app.Configuration.GetValue("SqlLogging:AbortScriptOnFailure", true);
 bool Always200 = app.Configuration.GetValue("Always200", true);
 var PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren();
@@ -126,6 +128,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
     string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
     string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
     SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
+    SqlLoggedWrappers = app.Configuration.GetSection("SqlLogging:Wrappers").GetChildren().Select(x => $"{x.Value}".ToLower()).ToList();
 
     string TranscriptPath = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("TranscriptPath", ScriptRoot)!);
     string TranscriptFullPath = Path.GetFullPath(TranscriptPath);
@@ -134,7 +137,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
     string GuidStr = System.Guid.NewGuid().ToString();
     string TranscriptFile = Path.Join(Wrapper, Script, DateStr, $"{Wrapper}_{Script}_{DateStr}_{TimeStr}_{PidFStr}_{GuidStr}.txt");
 
-    if (SqlLoggingEnabled) {
+    if (SqlLoggingEnabled && SqlLoggedWrappers.Contains(Wrapper.ToLower())) {
         AbortScriptOnSqlFailure = app.Configuration.GetValue("SqlLogging:AbortScriptOnFailure", true);
         SqlConnectionString = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:ConnectionString", "")!);
 
@@ -168,7 +171,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
         }
     }
 
-    if (SqlLoggingEnabled && AbortScriptOnSqlFailure && SqlRecord.Count < 1) {
+    if (SqlLoggingEnabled && AbortScriptOnSqlFailure && SqlLoggedWrappers.Contains(Wrapper.ToLower()) && SqlRecord.Count < 1) {
         success = false;
         error = $"SQL Error";
     } else {
@@ -399,7 +402,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
     }
 
 
-    if (SqlLoggingEnabled && SqlRecord.Count > 0) {
+    if (SqlLoggingEnabled && SqlRecord.Count > 0 && SqlLoggedWrappers.Contains(Wrapper.ToLower())) {
 
         Dictionary<string,object> SqlRecordData = new() {["EndDate"] = DateTime.Now, ["Error"] = error, ["Success"] = success, ["HadErrors"] = HadErrors};
         List<Dictionary<string,object>> SqlRecordFilter = new() {
