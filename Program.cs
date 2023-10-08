@@ -28,6 +28,7 @@ using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
+using System.Runtime.InteropServices;
 
 string ASPNETCORE_ENVIRONMENT = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")!;
 var WebAppBuilder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(args);
@@ -65,27 +66,29 @@ if (PSModulePath.Count > 0) {
     System.Environment.SetEnvironmentVariable("PSModulePath",PSModulePathStr);
 }
 
-
 string ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
-string IPAddressHeader = app.Configuration.GetValue("SqlLogging:IPAddressHeader", "")!;
 string PwShUrl = app.Configuration.GetValue("PwShUrl", "PowerShell")!;
-string UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
-string SqlConnectionString = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:ConnectionString", "")!);
-string SqlTable = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:Table", "Log")!);
-bool SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
-List<string> SqlLoggedWrappers = app.Configuration.GetSection("SqlLogging:Wrappers").GetChildren().Select(x => $"{x.Value}".ToLower()).ToList();
 bool AbortScriptOnSqlFailure = app.Configuration.GetValue("SqlLogging:AbortScriptOnFailure", true);
 bool Always200 = app.Configuration.GetValue("Always200", true);
 var PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren();
 var ScriptCache = new Dictionary<string, Dictionary<string, Dictionary<string, object>>>();
 var jOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = false , MaxDepth = 5, WriteIndented = true};
 List<string> CachedVariables = app.Configuration.GetSection("CachedVariables").GetChildren().Select(x => Environment.ExpandEnvironmentVariables($"{x.Value}")).ToList();
+string UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
 Dictionary<string,Dictionary<string,string>> FormatMap = app.Configuration.GetSection("FormatMapping").GetChildren().
     ToDictionary(x => x.Key, x => new Dictionary<string, string>() {["type"] = $"{x["type"]}", ["separator"] = $"{x["separator"]}"});
 
-if (SqlLoggingEnabled) {SqlTableCreate(SqlConnectionString, SqlTable);}
-
 ScriptLoader();
+
+string SqlConnectionString = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:ConnectionString", "")!);
+string SqlTable = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:Table", "Log")!);
+bool SqlLoggedWrapperInclusion = app.Configuration.GetValue("SqlLogging:Wrappers:include",true);
+List<string> SqlLoggedWrapperList = app.Configuration.GetSection("SqlLogging:Wrappers:list").GetChildren().Select(x => $"{x.Value}".ToLower()).ToList();
+bool WrapperSqlLoggingEnabled = true;
+string IPAddressHeader = app.Configuration.GetValue("SqlLogging:IPAddressHeader", "")!;
+bool SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
+
+if (SqlLoggingEnabled) {SqlTableCreate(SqlConnectionString, SqlTable);}
 
 string PSScriptRunner(string Wrapper, string Script, string Body, string Format, HttpContext Context) {
     ScriptRoot = app.Configuration.GetValue("ScriptRoot", Path.Join(ROOT_DIR, ".scripts"))!;
@@ -129,7 +132,11 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
     string WrapperFile = Path.Join(ScriptRoot, Wrapper, "wrapper.ps1");
     string ScriptFile = Path.Join(ScriptRoot, Wrapper, "scripts", $"{Script}.ps1");
     SqlLoggingEnabled = app.Configuration.GetValue("SqlLogging:Enabled", false);
-    SqlLoggedWrappers = app.Configuration.GetSection("SqlLogging:Wrappers").GetChildren().Select(x => $"{x.Value}".ToLower()).ToList();
+
+    SqlLoggedWrapperInclusion = app.Configuration.GetValue("SqlLogging:Wrappers:include",true);
+    SqlLoggedWrapperList = app.Configuration.GetSection("SqlLogging:Wrappers:list").GetChildren().Select(x => $"{x.Value}".ToLower()).ToList();
+    
+    WrapperSqlLoggingEnabled = (SqlLoggedWrapperInclusion && SqlLoggedWrapperList.Contains(Wrapper.ToLower())) || (!SqlLoggedWrapperInclusion && !SqlLoggedWrapperList.Contains(Wrapper.ToLower()));
 
     string TranscriptPath = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("TranscriptPath", ScriptRoot)!);
     string TranscriptFullPath = Path.GetFullPath(TranscriptPath);
@@ -138,7 +145,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
     string GuidStr = System.Guid.NewGuid().ToString();
     string TranscriptFile = Path.Join(Wrapper, Script, DateStr, $"{Wrapper}_{Script}_{DateStr}_{TimeStr}_{PidFStr}_{GuidStr}.txt");
 
-    if (SqlLoggingEnabled && SqlLoggedWrappers.Contains(Wrapper.ToLower())) {
+    if (SqlLoggingEnabled && WrapperSqlLoggingEnabled) {
         AbortScriptOnSqlFailure = app.Configuration.GetValue("SqlLogging:AbortScriptOnFailure", true);
         SqlConnectionString = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:ConnectionString", "")!);
 
@@ -173,7 +180,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
         }
     }
 
-    if (SqlLoggingEnabled && AbortScriptOnSqlFailure && SqlLoggedWrappers.Contains(Wrapper.ToLower()) && SqlRecord.Count < 1) {
+    if (SqlLoggingEnabled && WrapperSqlLoggingEnabled && AbortScriptOnSqlFailure && SqlRecord.Count < 1) {
         success = false;
         error = $"SQL Error";
     } else {
@@ -404,7 +411,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
     }
 
 
-    if (SqlLoggingEnabled && SqlRecord.Count > 0 && SqlLoggedWrappers.Contains(Wrapper.ToLower())) {
+    if (SqlLoggingEnabled && WrapperSqlLoggingEnabled && SqlRecord.Count > 0) {
 
         Dictionary<string,object> SqlRecordData = new() {["EndDate"] = DateTime.Now, ["Error"] = error, ["Success"] = success, ["HadErrors"] = HadErrors};
         List<Dictionary<string,object>> SqlRecordFilter = new() {
