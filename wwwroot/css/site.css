@@ -64,6 +64,14 @@ input, select, button, span {
   position: relative;
 }
 
+#alerts {
+  position:fixed;
+  top: 5px;
+  right: 5px;
+  width: 100%;
+  z-index:9999;
+}
+
 ._btn_copy {
   position: absolute; 
   top: 15px; 

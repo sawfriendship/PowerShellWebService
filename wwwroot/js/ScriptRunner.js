@@ -35,7 +35,7 @@ function load_wrapper_form() {
         }
     })
 
-}
+};
 
 function load_script_form(wrapper) {
     var PwShUrl = $('#conf input[name=PwShUrl]').val();
@@ -60,7 +60,8 @@ function load_script_form(wrapper) {
 				}
             },
             error: function(responce){
-                $('#_script').prop('disabled', true)
+                $('#_script').prop('disabled', true),
+                show_alert('<strong>Form load error</strong>','danger');
             }
         })
     } else {
@@ -68,7 +69,7 @@ function load_script_form(wrapper) {
     }
         
     if ('script' in localStorage) {$('#_script').val(localStorage['script'])}
-}
+};
 
 function ani_send(d) {
     $({num: 0}).animate({num: 80}, {
@@ -88,7 +89,7 @@ function ani_send(d) {
             $('#_result').css('background',`linear-gradient(60deg, rgb(0,0,0), rgb(${int_val},${int_val},${int_val}), rgb(0,0,0))`);
         }
     });
-}
+};
 
 function put_to_body() {
     var result = {};
@@ -116,7 +117,7 @@ function put_to_body() {
     })
     var j_string = JSON.stringify(result);
     $('#_body').val(j_string)
-}
+};
 
 function add_param() {$('#Param').clone().appendTo('#Params').show(200);} 
 
@@ -145,7 +146,7 @@ function update_url() {
     $('a#pwsh_url').prop('href',url)
     $('a#pwsh_url').html(url)
     console.log(url)
-}
+};
 
 function send_body() {
     var PwShUrl = $('#conf input[name=PwShUrl]').val();
@@ -187,25 +188,44 @@ function send_body() {
             $('._btn_send').removeClass('disabled')
             $('#_result').removeClass('processing')
             ani_send(200);
-            if (xhr.status == 200) {var responce_color = 'green'} else {var responce_color = 'red'}
-            $('.StatusCode').html(`<b>${xhr.status}</b>`).css({color:responce_color})
+            var alert_type = {true:'success',false:'danger'}[xhr.status == 200]
+            show_alert(`<strong>Status ${textStatus} Code ${xhr.status} Method ${method}</strong><br>`,alert_type)
         }
     }
-
     if (method != 'GET') {
         var j_string = $('#_body').val()
         if (j_string) {request_param['data'] = j_string}
         request_param['contentType'] = 'application/json; charset=utf-8'
     }
-
+    
     $.ajax(request_param);
     
-}
+};
 
-function write_to_clip() {navigator.clipboard.writeText($('#_result').val())}
 
-function cache_reload() {$.ajax({url:'/reload',success:function(responce){load_wrapper_form();}})}
-function cache_clear() {$.ajax({url:'/clear',success:function(responce){load_wrapper_form();}})}
+function write_to_clip() {navigator.clipboard.writeText($('#_result').val())};
+
+function cache_reload() {
+    $.ajax({
+        url:'/reload',
+        success:function(responce){load_wrapper_form();},
+        complete: function(xhr, textStatus) {
+            var alert_type = {true:'success',false:'danger'}[xhr.status == 200]
+            show_alert(`<strong>Reload ${alert_type}</strong>`,alert_type);
+        }
+    });
+};
+
+function cache_clear() {
+    $.ajax({
+        url:'/clear',
+        success:function(responce){load_wrapper_form();},
+        complete: function(xhr, textStatus) {
+            var alert_type = {true:'success',false:'danger'}[xhr.status == 200]
+            show_alert(`<strong>Clear ${alert_type}</strong>`,alert_type);
+        }
+    });
+};
 
 $(document).ready(function() {
     load_wrapper_form();
