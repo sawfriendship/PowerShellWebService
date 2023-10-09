@@ -66,6 +66,7 @@ input, select, button, span {
 
 #alerts {
   position:fixed;
+  opacity: 0.8;
   top: 5px;
   right: 5px;
   width: 100%;
