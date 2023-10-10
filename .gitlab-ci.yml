@@ -3,6 +3,8 @@ stages:
 
 deploy_to_iis:
   stage: deploy
+  tags:
+    - APP
   only:
     - main
   script: |
@@ -26,5 +28,3 @@ deploy_to_iis:
     Start-WebAppPool -Name $APP_POOL -Passthru | ft Name,State
     Start-WebSite -Name $WEB_SITE -Passthru | ft Id,Name,State
     (Get-Date).ToString('o')
-  tags:
-    - APP1
