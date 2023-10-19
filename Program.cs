@@ -57,7 +57,7 @@ app.UseStaticFiles();
 // app.UseDirectoryBrowser();
 
 app.UseRouting();
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 app.MapRazorPages();
 
 List<string> PSModulePath = app.Configuration.GetSection("PSModulePath").GetChildren().Select(x => x.Value!.ToString()).ToList<string>();
