@@ -7,7 +7,7 @@ deploy_to_iis:
     - APP
   only:
     - main
-  shell: pwsh -NoProfile {0}
+  shell: pwsh -NoProfile -Command {0}
   script: |
     chcp 65001
     $WEB_SITE = 'PowerShellWebService'
