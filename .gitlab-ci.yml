@@ -8,7 +8,6 @@ deploy_to_iis:
   only:
     - main
   script: |
-    $PROFILE.psobject.Properties | ft Name,Value
     $WEB_SITE = 'PowerShellWebService'
     $APP_POOL = 'PowerShellWebService'
     $APP_PATH = 'C:\inetpub\PowerShellWebService'
