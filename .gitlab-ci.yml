@@ -8,7 +8,7 @@ deploy_to_iis:
   only:
     - main
   script: |
-    Get-Process -Name $PID | % {$_.CommandLine -replace '.+EncodedCommand\s+'} | % {[System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String($_))}
+    Get-Process -id $PID | % {$_.CommandLine -replace '.+EncodedCommand\s+'} | % {[System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String($_))}
     $WEB_SITE = 'PowerShellWebService'
     $APP_POOL = 'PowerShellWebService'
     $APP_PATH = 'C:\inetpub\PowerShellWebService'
