@@ -1,6 +1,24 @@
 stages:
   - deploy
 
+jobs:
+  build:
+    runs-on: Windows
+    steps:
+    - name: VARS
+      shell: pwsh -NoProfile -Command {0}
+      run: |
+        '='*64
+        New-Object -TypeName PSCustomObject -Property $PSVersionTable | ft PSVersion,PSEdition
+        '-'*32
+        'Env:'
+        ls env:\*
+        '-'*32
+        'Global:'
+        Get-Variable -Name * | select Name,@{n='Value';e={ConvertTo-Json -Compress $_.Value -Depth 2 -WarningAction SilentlyContinue}} | ft -a
+        '-'*32
+        '='*64
+
 deploy_to_iis:
   stage: deploy
   tags:
