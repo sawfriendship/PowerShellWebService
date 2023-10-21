@@ -1,27 +1,5 @@
 stages:
-  - test
   - deploy
-
-test:
-  stage: test
-  tags:
-    - APP
-  script: |
-    'SCRIPT START!!!'
-    '='*128
-    '='*128
-    '='*128
-    '='*64
-    # New-Object -TypeName PSCustomObject -Property $PSVersionTable | fl *
-    '-'*32
-    'Env:'
-    ls env:\*
-    '-'*32
-    'Global:'
-    Get-Variable -Name * | select Name,@{n='Value';e={ConvertTo-Json -Compress $_.Value -Depth 2 -WarningAction SilentlyContinue}} | ft -a
-    '-'*32
-    '='*64
-    'SCRIPT END!!!'
 
 deploy_to_iis:
   stage: deploy
@@ -30,8 +8,6 @@ deploy_to_iis:
   only:
     - main
   script: |
-    'SCRIPT START!!!'
-    chcp 65001
     $WEB_SITE = 'PowerShellWebService'
     $APP_POOL = 'PowerShellWebService'
     $APP_PATH = 'C:\inetpub\PowerShellWebService'
@@ -51,4 +27,3 @@ deploy_to_iis:
     Start-WebAppPool -Name $APP_POOL -Passthru | ft Name,State
     Start-WebSite -Name $WEB_SITE -Passthru | ft Id,Name,State
     (Get-Date).ToString('o')
-    'SCRIPT END!!!'
