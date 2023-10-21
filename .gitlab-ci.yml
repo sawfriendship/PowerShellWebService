@@ -8,7 +8,7 @@ test:
     - APP
   script: |
     '='*64
-    New-Object -TypeName PSCustomObject -Property $PSVersionTable | ft PSVersion,PSEdition
+    New-Object -TypeName PSCustomObject -Property $PSVersionTable | fl *
     '-'*32
     'Env:'
     ls env:\*
