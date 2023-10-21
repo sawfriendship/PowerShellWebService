@@ -7,8 +7,11 @@ test:
   tags:
     - APP
   script: |
+    '='*128
+    '='*128
+    '='*128
     '='*64
-    New-Object -TypeName PSCustomObject -Property $PSVersionTable | fl *
+    # New-Object -TypeName PSCustomObject -Property $PSVersionTable | fl *
     '-'*32
     'Env:'
     ls env:\*
