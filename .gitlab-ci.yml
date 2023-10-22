@@ -15,14 +15,14 @@ deploy_to_iis:
     $APP_PATH = 'C:\inetpub\PowerShellWebService'
     $LOCATION = Get-Location
     New-Object -TypeName PSCustomObject -Property $PSVersionTable | ft PSVersion,PSEdition,OS
-    "$((Get-Date).ToString($df)) BUILD PROJECT BEGIN"
+    "$((Get-Date).ToString($df)) BUILD PROJECT"
     dotnet.exe build
     "$((Get-Date).ToString($df)) IMPORT-MODULE WEBADMINISTRATION"
     Import-Module WebAdministration -WarningAction:SilentlyContinue
     Get-WebSite -Name $WEB_SITE | ft Id,Name,State
     Write-Host $LOCATION -ForegroundColor Yellow
     Get-ChildItem -Path $LOCATION -Recurse | Group-Object -Property Directory | Select-Object -Property @(
-      ,@{n='Directory';e={$DIR=$_.Name.replace($LOCATION,'');if($DIR){$DIR}else{'\'}}}
+      ,@{n='Directory';e={$_.Name.replace($LOCATION,'')+'\'}}
       ,@{n='FileCount';e={$_.Count}}
     )
     "$((Get-Date).ToString($df)) STOP WEB SITE"
