@@ -28,7 +28,7 @@ if ($__BODY__) {
 Write-Debug "__WRAPPER__: $__WRAPPER__"
 Write-Debug "__SCRIPTNAME__: $__SCRIPTNAME__"
 Write-Debug "__QUERY__: $(ConvertTo-Json $__QUERY__)"
-Write-Debug "__BODY__: $(ConvertTo-Json $__BODY__)"
+Write-Debug "__BODY__: $__BODY__"
 
 
 # Using global var, that configured in CachedVariables section of config.json file

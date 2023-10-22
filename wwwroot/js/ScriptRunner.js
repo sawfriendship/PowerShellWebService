@@ -151,7 +151,8 @@ function update_url() {
 function send_body() {
     var PwShUrl = $('#conf input[name=PwShUrl]').val();
     var method = $(this).attr('method')
-    var depth = $('._depth').val()
+    var depth = $('#SendParam input[name=maxDepth]').val()
+    var enumsAsStrings = $('#SendParam input[name=enumsAsStrings]').val()
     var outputtype = $('._outputtype').val()
     var wrapper = $('#_wrapper').val()
     var script = $('#_script').val()
@@ -159,7 +160,7 @@ function send_body() {
     var request_param = {
         url: url,
         method: method,
-        headers: {maxDepth:depth},
+        headers: {__maxDepth__:depth,__enums__:enumsAsStrings},
         beforeSend: function(responce){
             $('._btn_send').addClass('disabled')
             $('#_result').addClass('processing')

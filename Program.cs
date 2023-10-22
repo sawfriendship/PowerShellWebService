@@ -95,32 +95,50 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
     PSRunspaceVariables = app.Configuration.GetSection("Variables").GetChildren();
     UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
     System.Text.RegularExpressions.Regex __Keys__ = new Regex(@"^__.+__$", RegexOptions.IgnoreCase);
-    Dictionary<string, string> Query = Context.Request.Query.Where(x => !__Keys__.IsMatch(x.Key)).ToDictionary(x => x.Key, x => $"{x.Value}");
     Dictionary<string, string> Headers = Context.Request.Headers.Where(x => !__Keys__.IsMatch(x.Key)).ToDictionary(x => x.Key, x => $"{x.Value}");
-    string AuthorizationHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization").Select(x => x.Key).FirstOrDefault("");
+    Dictionary<string, string> Query = Context.Request.Query.Where(x => !__Keys__.IsMatch(x.Key)).ToDictionary(x => x.Key, x => $"{x.Value}");
+    Dictionary<string, string> AllHeaders = Context.Request.Headers.ToDictionary(x => x.Key.ToUpper(), x => $"{x.Value}");
+    Dictionary<string, string> AllQuery = Context.Request.Query.ToDictionary(x => x.Key.ToUpper(), x => $"{x.Value}");
     string LogIPAddress = Context.Request.Headers.Where(x => IPAddressHeader.Length > 0 && x.Key.ToLower() == IPAddressHeader.ToLower()).Select(x => x.Value).FirstOrDefault($"{Context.Connection.RemoteIpAddress}")!;
     string ContentType = $"{Context.Request.ContentType}";
+    string AuthorizationHeader = Context.Request.Headers.Where(x => x.Key.ToLower() == "authorization").Select(x => x.Key).FirstOrDefault("");
     if (Headers.ContainsKey(AuthorizationHeader)) { Headers[AuthorizationHeader] = $"{Context.User.Identity!.AuthenticationType} ***"; }
 
-    int maxDepth = app.Configuration.GetValue("JsonSerialization:maxDepth", 4);
-    bool enumsAsStrings = app.Configuration.GetValue("JsonSerialization:enumsAsStrings", true);
-    bool compressOutput = app.Configuration.GetValue("JsonSerialization:compressOutput", false);
+    int maxDepth = 4;
+    bool enumsAsStrings = true;
+    bool compressOutput = false;
 
-    string h_depth = Context.Request.Headers.Where(x => x.Key.ToLower() == "depth" || x.Key.ToLower() == "maxdepth").Select(x => x.Key).FirstOrDefault("");
-    string h_enums = Context.Request.Headers.Where(x => x.Key.ToLower() == "enums" || x.Key.ToLower() == "enumsAsStrings").Select(x => x.Key).FirstOrDefault("");
-    string h_compress = Context.Request.Headers.Where(x => x.Key.ToLower() == "compress" || x.Key.ToLower() == "compressOutput").Select(x => x.Key).FirstOrDefault("");
+    if (AllHeaders.ContainsKey("__MAXDEPTH__") && AllHeaders["__MAXDEPTH__"].Length > 0) {
+        if (int.TryParse(AllHeaders["__MAXDEPTH__"], out int maxDepth_)) { maxDepth = maxDepth_; }
+    } else if (AllQuery.ContainsKey("__MAXDEPTH__") && AllQuery["__MAXDEPTH__"].Length > 0) {
+        if (int.TryParse(AllQuery["__MAXDEPTH__"], out int maxDepth_)) { maxDepth = maxDepth_; }
+    } else {
+        maxDepth = app.Configuration.GetValue("JsonSerialization:maxDepth", 4);
+    }
 
-    if (h_depth.Length > 0) { if (int.TryParse(Headers[h_depth], out int h_depth_)) { maxDepth = h_depth_; }}
-    if (h_enums.Length > 0) { if (int.TryParse(Headers[h_enums], out int h_enums_)) { enumsAsStrings = Convert.ToBoolean(h_enums_); }}
-    if (h_compress.Length > 0) { if (int.TryParse(Headers[h_compress], out int h_compress_)) { compressOutput = Convert.ToBoolean(h_compress_); }}
+    if (AllHeaders.ContainsKey("__ENUMS__") && AllHeaders["__ENUMS__"].Length > 0) {
+        if (int.TryParse(AllHeaders["__ENUMS__"], out int enumsAsStrings_)) { enumsAsStrings = Convert.ToBoolean(enumsAsStrings_); }
+    } else if (AllQuery.ContainsKey("__ENUMS__") && AllQuery["__ENUMS__"].Length > 0) {
+        if (int.TryParse(AllQuery["__ENUMS__"], out int enumsAsStrings_)) { enumsAsStrings = Convert.ToBoolean(enumsAsStrings_); }
+    } else {
+        enumsAsStrings = app.Configuration.GetValue("JsonSerialization:enumsAsStrings", true);
+    }
 
-    Process CurrentProcess = Process.GetCurrentProcess();
-    string PidFStr = CurrentProcess.Id.ToString("000000");
+    if (AllHeaders.ContainsKey("__COMPRESS__") && AllHeaders["__COMPRESS__"].Length > 0) {
+        if (int.TryParse(AllHeaders["__COMPRESS__"], out int compressOutput_)) { compressOutput = Convert.ToBoolean(compressOutput_); }
+    } else if (AllQuery.ContainsKey("__COMPRESS__") && AllQuery["__COMPRESS__"].Length > 0) {
+        if (int.TryParse(AllQuery["__COMPRESS__"], out int compressOutput_)) { compressOutput = Convert.ToBoolean(compressOutput_); }
+    } else {
+        compressOutput = app.Configuration.GetValue("JsonSerialization:compressOutput", false);
+    }
+
+    // Process CurrentProcess = Process.GetCurrentProcess();
+    string PidFStr = Environment.ProcessId.ToString("000000");
     Dictionary<string,object> SqlRecord = new();
     OrderedDictionary ResultTable = new();
     Collection<PSObject> PSObjects = new();
     OrderedDictionary Streams = new();
-    OrderedDictionary StateInfo = new() {["pid"] = CurrentProcess.Id};
+    OrderedDictionary StateInfo = new() {["pid"] = Environment.ProcessId};
     List<Object> ErrorList = new();
     List<Object> WarningList = new();
     List<Object> VerboseList = new();
@@ -157,7 +175,7 @@ string PSScriptRunner(string Wrapper, string Script, string Body, string Format,
 
         Dictionary<string,object> SqlLogParam = new()
         {
-            ["PID"] = Process.GetCurrentProcess().Id,
+            ["PID"] = Environment.ProcessId,
             ["IPAddress"] = LogIPAddress,
             ["Method"] = Context.Request.Method,
             ["ContentType"] = ContentType,
@@ -773,28 +791,28 @@ app.MapPost("/config/upload", async (HttpContext Context) =>
     }
 );
 
-app.Map("/getRoles", async (HttpContext Context) =>
+app.MapGet("/getRoles", async (HttpContext Context) =>
     {
         var get_roles = getRoles(Context);
         await Context.Response.WriteAsJsonAsync(new { get_roles = get_roles, Error = "" }, jOptions);
     }
 );
 
-app.Map("/hasRole", async (HttpContext Context) =>
+app.MapGet("/hasRole", async (HttpContext Context) =>
     {
         bool has_role = hasRole(Context);
         await Context.Response.WriteAsJsonAsync(new { has_role = has_role, Error = "" }, jOptions);
     }
 );
 
-app.Map("/hasRole/{RoleName}", async (string RoleName, HttpContext Context) =>
+app.MapGet("/hasRole/{RoleName}", async (string RoleName, HttpContext Context) =>
     {
         bool has_role = hasRole(Context,RoleName);
         await Context.Response.WriteAsJsonAsync(new { has_role = has_role, Error = "" }, jOptions);
     }
 );
 
-app.Map("/whoami", async (HttpContext Context) =>
+app.MapGet("/whoami", async (HttpContext Context) =>
     {
         Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
         var Headers = Context.Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString());
@@ -808,7 +826,7 @@ app.Map("/whoami", async (HttpContext Context) =>
             ["Host"] = Context.Request.Host,
             ["Headers"] = Headers,
             ["Connection"] = Context.Connection,
-            ["pid"] = Process.GetCurrentProcess().Id,
+            ["pid"] = Environment.ProcessId,
             ["User"] = Context.User,
         };
 
@@ -817,7 +835,7 @@ app.Map("/whoami", async (HttpContext Context) =>
     }
 );
 
-app.Map("/token", async (HttpContext Context) =>
+app.MapGet("/token", async (HttpContext Context) =>
     {
         Dictionary<String, object> Result = new()
         {
@@ -840,7 +858,7 @@ app.Map("/token", async (HttpContext Context) =>
     }
 );
 
-app.Map("/logout", async (HttpContext Context) =>
+app.MapGet("/logout", async (HttpContext Context) =>
     {   
         long dt = DateTime.Now.ToFileTime();
         Context.Response.Redirect($"/login?dt={dt}", permanent: false);
@@ -848,7 +866,7 @@ app.Map("/logout", async (HttpContext Context) =>
     }
 );
 
-app.Map("/login", async (HttpContext Context) =>
+app.MapGet("/login", async (HttpContext Context) =>
     {
         DateTime dt = DateTime.Now;
         Dictionary<string,string> Query = Context.Request.Query.ToDictionary(x => x.Key.ToString().ToLower(), x => x.Value.ToString());
@@ -863,7 +881,7 @@ app.Map("/login", async (HttpContext Context) =>
     }
 );
 
-app.Map("/reload", async (HttpContext Context) =>
+app.MapGet("/reload", async (HttpContext Context) =>
     {
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
         if (hasRole(Context,"Admin") || IsDevelopment) {
@@ -876,7 +894,7 @@ app.Map("/reload", async (HttpContext Context) =>
     }
 );
 
-app.Map("/clear", async (HttpContext Context) =>
+app.MapGet("/clear", async (HttpContext Context) =>
     {
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
         if (hasRole(Context,"Admin") || IsDevelopment) {
@@ -889,7 +907,7 @@ app.Map("/clear", async (HttpContext Context) =>
     }
 );
 
-app.Map($"/{PwShUrl}/", async (HttpContext Context) =>
+app.MapGet($"/{PwShUrl}/", async (HttpContext Context) =>
     {
         bool UserIsInRoleAdmin = hasRole(Context);
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
@@ -906,7 +924,7 @@ app.Map($"/{PwShUrl}/", async (HttpContext Context) =>
     }
 );
 
-app.Map($"/{PwShUrl}/{{Wrapper}}", async (string Wrapper, HttpContext Context) =>
+app.MapGet($"/{PwShUrl}/{{Wrapper}}", async (string Wrapper, HttpContext Context) =>
     {
         IsDevelopment = app.Configuration.GetValue("IsDevelopment", false);
         bool WrapperIsPublic = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().Count() == 0;
@@ -1162,7 +1180,7 @@ app.MapGet("/log/{id:int}", async (int id, HttpContext Context) =>
     }
 );
 
-app.Map("/transcript/{id:int}", async (int id, HttpContext Context) =>
+app.MapGet("/transcript/{id:int}", async (int id, HttpContext Context) =>
     {
         List<Dictionary<string,object>> data = new();
 
