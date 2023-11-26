@@ -75,14 +75,16 @@
                 </div>
             </form>
             <br>
-            @* @if (hasRole(HttpContext,"Admin") || IsDevelopment)
+            @*
+            @if (hasRole(HttpContext,"Admin") || IsDevelopment)
             {
                 <div class="input-group input-group-sm w-100">
                     <button type="button" class="_btn_reload btn btn-dark btn-outline-success w-50" >Reload Cache</button>
                     <button type="button" class="_btn_clear btn btn-dark btn-outline-danger w-50" >Clear Cache</button>
                 </div>
-            } *@
+            }
             <br>
+            *@
             <div class="input-group input-group-sm w-100">
                 <span>Params</span>
                 <button type="button" class="_btn_add_param btn btn-outline-dark w-100">Add</button>
