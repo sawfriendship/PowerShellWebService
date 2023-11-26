@@ -75,10 +75,12 @@ var ScriptCache = new Dictionary<string, Dictionary<string, Dictionary<string, o
 var jOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = false , MaxDepth = 5, WriteIndented = true};
 List<string> CachedVariables = app.Configuration.GetSection("CachedVariables").GetChildren().Select(x => Environment.ExpandEnvironmentVariables($"{x.Value}")).ToList();
 string UserCredentialVariable = app.Configuration.GetValue("UserCredentialVariable", "")!;
+DateTime ScriptLoadLastTime = DateTime.Now;
 Dictionary<string,Dictionary<string,string>> FormatMap = app.Configuration.GetSection("FormatMapping").GetChildren().
     ToDictionary(x => x.Key, x => new Dictionary<string, string>() {["type"] = $"{x["type"]}", ["separator"] = $"{x["separator"]}"});
 
 ScriptLoader();
+
 
 string SqlConnectionString = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:ConnectionString", "")!);
 string SqlTable = Environment.ExpandEnvironmentVariables(app.Configuration.GetValue("SqlLogging:Table", "Log")!);
@@ -677,6 +679,7 @@ Dictionary<String, List<String>> ScriptLoader() {
             }
         }
     }
+    ScriptLoadLastTime = DateTime.Now;
     return results;
 }
  
@@ -950,7 +953,7 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}.{{Format}}", async (string Wrapper, 
         Context.Response.Headers["Content-Type"] = RESPONSE_CONTENT_TYPE;
         bool WrapperIsPublic = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().Count() == 0;
         bool WrapperPermission = app.Configuration.GetSection($"WrapperPermissions:{Wrapper}").GetChildren().Any(x => Context.User.IsInRole($"{x.Value}"));
-
+        int ScriptNoReloadTime = app.Configuration.GetValue("ScriptNoReloadTime", 15)!;
         if (!WrapperPermission && !WrapperIsPublic && !IsDevelopment) {
             if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.Forbidden;}
             await Context.Response.WriteAsJsonAsync(new { Success = false, Error = "access denied" }, jOptions);
@@ -963,9 +966,11 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}.{{Format}}", async (string Wrapper, 
             string hostname = Context.Request.Host.ToString();
             
             if (!ScriptCache.ContainsKey(Wrapper)) {
+                if (ScriptLoadLastTime.AddSeconds(ScriptNoReloadTime) < DateTime.Now) {ScriptLoader();}
                 if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.NotFound;}
                 await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Wrapper '{Wrapper}' not found in cache, use {hostname}/reload to load new scripts or wrappers and {hostname}/clear to clear all" }, jOptions);
             } else if (!ScriptCache[Wrapper].ContainsKey(Script)) {
+                if (ScriptLoadLastTime.AddSeconds(ScriptNoReloadTime) < DateTime.Now) {ScriptLoader();}
                 if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.NotFound;}
                 await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Script '{Script}' not found in cache, use {hostname}/reload to load new scripts or wrappers and {hostname}/clear to clear all" }, jOptions);
             } else if (!File.Exists(WrapperFile)) {
