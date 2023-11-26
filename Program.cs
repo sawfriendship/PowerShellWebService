@@ -966,19 +966,19 @@ app.Map($"/{PwShUrl}/{{Wrapper}}/{{Script}}.{{Format}}", async (string Wrapper, 
             string hostname = Context.Request.Host.ToString();
             
             if (!ScriptCache.ContainsKey(Wrapper)) {
-                if (ScriptLoadLastTime.AddSeconds(ScriptNoReloadTime) < DateTime.Now) {ScriptLoader();}
+                if (ScriptLoadLastTime.AddSeconds(ScriptNoReloadTime) > DateTime.Now) {ScriptLoader();}
                 if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.NotFound;}
                 await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Wrapper '{Wrapper}' not found in cache, use {hostname}/reload to load new scripts or wrappers and {hostname}/clear to clear all" }, jOptions);
             } else if (!ScriptCache[Wrapper].ContainsKey(Script)) {
-                if (ScriptLoadLastTime.AddSeconds(ScriptNoReloadTime) < DateTime.Now) {ScriptLoader();}
+                if (ScriptLoadLastTime.AddSeconds(ScriptNoReloadTime) > DateTime.Now) {ScriptLoader();}
                 if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.NotFound;}
                 await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Script '{Script}' not found in cache, use {hostname}/reload to load new scripts or wrappers and {hostname}/clear to clear all" }, jOptions);
             } else if (!File.Exists(WrapperFile)) {
-                if (ScriptLoadLastTime.AddSeconds(ScriptNoReloadTime) < DateTime.Now) {ScriptLoader();}
+                if (ScriptLoadLastTime.AddSeconds(ScriptNoReloadTime) > DateTime.Now) {ScriptLoader();}
                 if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.NotFound;}
                 await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Wrapper '{Wrapper}' not found on disk, use {hostname}/reload to load new scripts or wrappers and {hostname}/clear to clear all" }, jOptions);
             } else if (!File.Exists(ScriptFile)) {
-                if (ScriptLoadLastTime.AddSeconds(ScriptNoReloadTime) < DateTime.Now) {ScriptLoader();}
+                if (ScriptLoadLastTime.AddSeconds(ScriptNoReloadTime) > DateTime.Now) {ScriptLoader();}
                 if (!Always200) {Context.Response.StatusCode = (int)System.Net.HttpStatusCode.NotFound;}
                 await Context.Response.WriteAsJsonAsync(new { Success = false, Error = $"Script '{Script}' not found on disk, use {hostname}/reload to load new scripts or wrappers and {hostname}/clear to clear all" }, jOptions);
             } else {
