@@ -20,21 +20,21 @@ job-test-config:
   script: |
     pwd
     ls
-    $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
+    # $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
 
-    $xml = [xml]::new()
-    $xml.Load("$pwd\web.config")
-    $xml.SelectSingleNode('/configuration/location[@path="."]/system.webServer/aspNetCore/environmentVariables/environmentVariable[@name="SQL_TABLE"]').SetAttribute('value',$env:SQL_TABLE)
-    $xml.SelectSingleNode('/configuration/location[@path="."]/system.webServer/aspNetCore/environmentVariables/environmentVariable[@name="SQL_CONNECTION_STRING"]').SetAttribute('value',$env:SQL_CONNECTION_STRING)
-    $xml.Save("$pwd\web.config")
+    # $xml = [xml]::new()
+    # $xml.Load("$pwd\web.config")
+    # $xml.SelectSingleNode('/configuration/location[@path="."]/system.webServer/aspNetCore/environmentVariables/environmentVariable[@name="SQL_TABLE"]').SetAttribute('value',$env:SQL_TABLE)
+    # $xml.SelectSingleNode('/configuration/location[@path="."]/system.webServer/aspNetCore/environmentVariables/environmentVariable[@name="SQL_CONNECTION_STRING"]').SetAttribute('value',$env:SQL_CONNECTION_STRING)
+    # $xml.Save("$pwd\web.config")
 
-    $config.test.servers | % {
-      Copy-Item -Path "$pwd\appsettings.json" -Destination $_.path.remote -Recurse -Force
-      Copy-Item -Path "$pwd\web.config" -Destination $_.path.remote -Recurse -Force
-      Start-Sleep -second 5
-      $_.url
-      Invoke-RestMethod -Uri $_.url -SkipCertificateCheck -UseBasicParsing | ft
-    }
+    # $config.test.servers | % {
+    #   Copy-Item -Path "$pwd\appsettings.json" -Destination $_.path.remote -Recurse -Force
+    #   Copy-Item -Path "$pwd\web.config" -Destination $_.path.remote -Recurse -Force
+    #   Start-Sleep -second 5
+    #   $_.url
+    #   Invoke-RestMethod -Uri $_.url -SkipCertificateCheck -UseBasicParsing | ft
+    # }
 
 job-prod-config:
   stage: prod-config
