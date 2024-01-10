@@ -109,3 +109,105 @@ job-prod-wwwroot:
     $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
         $config.test.servers | % {Copy-Item -Path "$pwd\wwwroot" -Destination $_.path.remote -Recurse -Force}
 
+job-test-build:
+  stage: test-build
+  tags: ["APP"]
+  environment: production
+  rules:
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      changes:
+        - 'Program.cs'
+        - 'Pages/**'
+        - 'PowerShellWebService.*'
+  script: |
+    $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
+    $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
+    $config.test.servers | % {
+      $local_build_path = "$($_.path.local)\build"
+      $remote_build_path = "$($_.path.remote)\build"
+
+      Remove-Item -Path $remote_build_path -Force -Recurse -ErrorAction Ignore
+      New-Item -Type Directory -Path $remote_build_path -Force
+
+      Copy-Item -Path "$pwd\.scripts" -Destination $remote_build_path -Recurse -Force
+      Copy-Item -Path "$pwd\PowerShellWebService.*" -Destination $remote_build_path -Recurse -Force
+      Copy-Item -Path "$pwd\Program.cs" -Destination $remote_build_path -Recurse -Force
+      Copy-Item -Path "$pwd\Pages" -Destination $remote_build_path -Recurse -Force
+      Copy-Item -Path "$pwd\wwwroot" -Destination $remote_build_path -Recurse -Force
+
+      Invoke-Command -ComputerName $_.server -ArgumentList @{server=$_} -ScriptBlock {
+        $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
+        $params = $args[0]
+        $local_path = $params.server.path.local
+        $local_build_path = "$local_path\build"
+
+        # New-Object -TypeName PSCustomObject -Property $PSVersionTable | ft PSVersion,PSEdition,OS
+        # dotnet --info
+
+        dotnet build "$local_build_path"
+        Import-Module WebAdministration -WarningAction:SilentlyContinue
+        
+        Get-WebSite -Name $params.server.site | ft Id,Name,State
+        Stop-WebSite -Name $params.server.site -Passthru | ft Id,Name,State
+        Get-WebAppPoolState -Name $params.server.pool | ? {$_.Value -ne 'Stopped'} | % {Stop-WebAppPool -Name $params.server.pool -Passthru} | ft Name,State
+        
+        Copy-Item -Path "$local_build_path\bin\Debug\net7.0-windows\*" -Destination "$local_path\" -Force -Recurse # -PassThru | % FullName
+        Copy-Item -Path "C:\Program Files\PowerShell\7\sni.dll" -Destination "$local_path\" -Force -Recurse # -PassThru | % FullName
+        
+        Start-WebAppPool -Name $params.server.pool -Passthru | ft Name,State
+        Start-WebSite -Name $params.server.site -Passthru | ft Id,Name,State
+
+      }
+    }
+
+job-prod-build:
+  stage: prod-build
+  tags: ["APP"]
+  environment: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - 'Program.cs'
+        - 'Pages/**'
+        - 'PowerShellWebService.*'
+  script: |
+    $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
+    $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
+    $config.prod.servers | % {
+      $local_build_path = "$($_.path.local)\build"
+      $remote_build_path = "$($_.path.remote)\build"
+
+      Remove-Item -Path $remote_build_path -Force -Recurse -ErrorAction Ignore
+      New-Item -Type Directory -Path $remote_build_path -Force
+
+      Copy-Item -Path "$pwd\.scripts" -Destination $remote_build_path -Recurse -Force
+      Copy-Item -Path "$pwd\PowerShellWebService.*" -Destination $remote_build_path -Recurse -Force
+      Copy-Item -Path "$pwd\Program.cs" -Destination $remote_build_path -Recurse -Force
+      Copy-Item -Path "$pwd\Pages" -Destination $remote_build_path -Recurse -Force
+      Copy-Item -Path "$pwd\wwwroot" -Destination $remote_build_path -Recurse -Force
+
+      Invoke-Command -ComputerName $_.server -ArgumentList @{server=$_} -ScriptBlock {
+        $ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
+        $params = $args[0]
+        $local_path = $params.server.path.local
+        $local_build_path = "$local_path\build"
+
+        New-Object -TypeName PSCustomObject -Property $PSVersionTable | ft PSVersion,PSEdition,OS
+        dotnet --info
+
+        dotnet build "$local_build_path"
+        Import-Module WebAdministration -WarningAction:SilentlyContinue
+        
+        Get-WebSite -Name $params.server.site | ft Id,Name,State
+        Stop-WebSite -Name $params.server.site -Passthru | ft Id,Name,State
+        Get-WebAppPoolState -Name $params.server.pool | ? {$_.Value -ne 'Stopped'} | % {Stop-WebAppPool -Name $params.server.pool -Passthru} | ft Name,State
+        
+        Copy-Item -Path "$local_build_path\bin\Debug\net7.0-windows\*" -Destination "$local_path\" -Force -Recurse # -PassThru | % FullName
+        Copy-Item -Path "C:\Program Files\PowerShell\7\sni.dll" -Destination "$local_path\" -Force -Recurse # -PassThru | % FullName
+        
+        Start-WebAppPool -Name $params.server.pool -Passthru | ft Name,State
+        Start-WebSite -Name $params.server.site -Passthru | ft Id,Name,State
+
+      }
+    }
+
