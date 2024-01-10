@@ -5,7 +5,7 @@
                 "server":"localhost",
                 "site":"PowerShellWebServiceTest",
                 "pool":"PowerShellWebServiceTest",
-                "url":"http://localhost:9881/check/config",
+                "url":"http://localhost:9881/config/check",
                 "path": {
                     "local":"C:\\inetpub\\PowerShellWebServiceTest",
                     "remote":"\\\\localhost\\C$\\inetpub\\PowerShellWebServiceTest"
@@ -19,7 +19,7 @@
                 "server":"localhost",
                 "site":"PowerShellWebService",
                 "pool":"PowerShellWebService",
-                "url":"http://localhost:9882/check/config",
+                "url":"http://localhost:9882/config/check",
                 "path": {
                     "local":"C:\\inetpub\\PowerShellWebService",
                     "remote":"\\\\localhost\\C$\\inetpub\\PowerShellWebService"
