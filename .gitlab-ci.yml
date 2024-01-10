@@ -8,4 +8,4 @@ deploy_to_iis:
   only:
     - main
   script: |
-    echo "ok5"
+    echo $TEST_VAR
