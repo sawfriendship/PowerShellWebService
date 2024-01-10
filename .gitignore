@@ -1,4 +1,3 @@
-.deploy_config.json
 appsettings.*.json
 bin
 obj
