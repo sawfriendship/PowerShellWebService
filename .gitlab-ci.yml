@@ -58,3 +58,25 @@ job-prod-config:
       $_.url
       Invoke-RestMethod -Uri $_.url -SkipCertificateCheck -UseBasicParsing | ft
     }
+
+job-test-scripts:
+  stage: test-scripts
+  tags: ["APP"]
+  environment: production
+  rules:
+    - changes:
+        - .scripts/**
+  script: |
+    $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
+    $config.test.servers | % {Copy-Item -Path "$pwd\.scripts" -Destination $_.path.remote -Recurse -Force}
+
+job-prod-scripts:
+  stage: prod-scripts
+  tags: ["APP"]
+  environment: production
+  rules:
+    - changes:
+        - .scripts/**
+  script: |
+    $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
+        $config.test.servers | % {Copy-Item -Path "$pwd\.scripts" -Destination $_.path.remote -Recurse -Force}
