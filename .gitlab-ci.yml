@@ -84,3 +84,28 @@ job-prod-scripts:
   script: |
     $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
         $config.test.servers | % {Copy-Item -Path "$pwd\.scripts" -Destination $_.path.remote -Recurse -Force}
+
+job-test-wwwroot:
+  stage: test-wwwroot
+  tags: ["APP"]
+  environment: production
+  rules:
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      changes:
+        - 'wwwroot/**'
+  script: |
+    $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
+    $config.test.servers | % {Copy-Item -Path "$pwd\wwwroot" -Destination $_.path.remote -Recurse -Force}
+
+job-prod-wwwroot:
+  stage: prod-wwwroot
+  tags: ["APP"]
+  environment: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - 'wwwroot/**'
+  script: |
+    $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
+        $config.test.servers | % {Copy-Item -Path "$pwd\wwwroot" -Destination $_.path.remote -Recurse -Force}
+
