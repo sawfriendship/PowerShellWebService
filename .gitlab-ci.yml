@@ -1,11 +1,60 @@
 stages:
-  - deploy
+  - test-config
+  - test-scripts
+  - test-wwwroot
+  - test-build
+  - prod-config
+  - prod-scripts
+  - prod-wwwroot
+  - prod-build
 
-deploy_to_iis:
-  stage: deploy
-  tags:
-    - APP
-  only:
-    - main
+
+job-test-config:
+  stage: test-config
+  tags: ["APP"]
+  environment: production
+  rules:
+    - changes:
+        - appsettings.json
+        - web.config
   script: |
-    echo $TEST_VAR
+    $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
+
+    $xml = [xml]::new()
+    $xml.Load("$pwd\web.config")
+    $xml.SelectSingleNode('/configuration/location[@path="."]/system.webServer/aspNetCore/environmentVariables/environmentVariable[@name="SQL_TABLE"]').SetAttribute('value',$env:SQL_TABLE)
+    $xml.SelectSingleNode('/configuration/location[@path="."]/system.webServer/aspNetCore/environmentVariables/environmentVariable[@name="SQL_CONNECTION_STRING"]').SetAttribute('value',$env:SQL_CONNECTION_STRING)
+    $xml.Save("$pwd\web.config")
+
+    $config.test.servers | % {
+      Copy-Item -Path "$pwd\appsettings.json" -Destination $_.path.remote -Recurse -Force
+      Copy-Item -Path "$pwd\web.config" -Destination $_.path.remote -Recurse -Force
+      Start-Sleep -second 5
+      $_.url
+      Invoke-RestMethod -Uri $_.url -SkipCertificateCheck -UseBasicParsing | ft
+    }
+
+job-prod-config:
+  stage: prod-config
+  tags: ["APP"]
+  environment: production
+  rules:
+    - changes:
+        - appsettings.json
+        - web.config
+  script: |
+    $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
+
+    $xml = [xml]::new()
+    $xml.Load("$pwd\web.config")
+    $xml.SelectSingleNode('/configuration/location[@path="."]/system.webServer/aspNetCore/environmentVariables/environmentVariable[@name="SQL_TABLE"]').SetAttribute('value',$env:SQL_TABLE)
+    $xml.SelectSingleNode('/configuration/location[@path="."]/system.webServer/aspNetCore/environmentVariables/environmentVariable[@name="SQL_CONNECTION_STRING"]').SetAttribute('value',$env:SQL_CONNECTION_STRING)
+    $xml.Save("$pwd\web.config")
+
+    $config.prod.servers | % {
+      Copy-Item -Path "$pwd\appsettings.json" -Destination $_.path.remote -Recurse -Force
+      Copy-Item -Path "$pwd\web.config" -Destination $_.path.remote -Recurse -Force
+      Start-Sleep -second 5
+      $_.url
+      Invoke-RestMethod -Uri $_.url -SkipCertificateCheck -UseBasicParsing | ft
+    }

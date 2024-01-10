@@ -1,3 +1,4 @@
+.deploy_config.json
 appsettings.*.json
 bin
 obj
@@ -8,4 +9,3 @@ logs
 *.zip
 *.dib
 *.ipynb
-.fake

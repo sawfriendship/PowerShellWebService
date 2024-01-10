@@ -1,0 +1,30 @@
+{
+    "test": {
+        "servers": [
+            {
+                "server":"localhost",
+                "site":"PowerShellWebServiceTest",
+                "pool":"PowerShellWebServiceTest",
+                "url":"http://localhost:8080/check/config",
+                "path": {
+                    "local":"C:\\inetpub\\PowerShellWebServiceTest",
+                    "remote":"\\\\localhost\\C$\\inetpub\\PowerShellWebServiceTest"
+                }
+            }
+        ]
+    },
+    "prod": {
+        "servers": [
+            {
+                "server":"localhost",
+                "site":"PowerShellWebService",
+                "pool":"PowerShellWebService",
+                "url":"http://localhost/check/config",
+                "path": {
+                    "local":"C:\\inetpub\\PowerShellWebService",
+                    "remote":"\\\\localhost\\C$\\inetpub\\PowerShellWebService"
+                }
+            }
+        ]
+    }
+}
