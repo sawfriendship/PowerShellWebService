@@ -14,7 +14,8 @@ job-test-config:
   tags: ["APP"]
   environment: production
   rules:
-    - changes:
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      changes:
         - appsettings.json
         - web.config
   script: |
@@ -39,7 +40,8 @@ job-prod-config:
   tags: ["APP"]
   environment: production
   rules:
-    - changes:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
         - appsettings.json
         - web.config
   script: |
