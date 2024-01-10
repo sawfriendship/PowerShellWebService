@@ -18,6 +18,8 @@ job-test-config:
         - appsettings.json
         - web.config
   script: |
+    pwd
+    ls
     $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
 
     $xml = [xml]::new()
