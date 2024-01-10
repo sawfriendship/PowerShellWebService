@@ -4,7 +4,6 @@ obj
 logs
 .transcript
 .vs
-.vscode
 *.bak
 *.zip
 *.dib

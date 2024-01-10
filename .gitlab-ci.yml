@@ -8,31 +8,4 @@ deploy_to_iis:
   only:
     - main
   script: |
-    $df = 'yyyy-MM-dd HH:mm:ss'
-    "$((Get-Date).ToString($df)) BEGIN"
-    $WEB_SITE = 'PowerShellWebService'
-    $APP_POOL = 'PowerShellWebService'
-    $APP_PATH = 'C:\inetpub\PowerShellWebService'
-    $LOCATION = Get-Location
-    New-Object -TypeName PSCustomObject -Property $PSVersionTable | ft PSVersion,PSEdition,OS
-    "$((Get-Date).ToString($df)) BUILD PROJECT"
-    dotnet.exe build
-    "$((Get-Date).ToString($df)) IMPORT-MODULE WEBADMINISTRATION"
-    Import-Module WebAdministration -WarningAction:SilentlyContinue
-    Get-WebSite -Name $WEB_SITE | ft Id,Name,State
-    Write-Host $LOCATION -ForegroundColor Yellow
-    Get-ChildItem -Path $LOCATION -Recurse | Group-Object -Property Directory | Select-Object -Property @(
-      ,@{n='Directory';e={$_.Name.replace($LOCATION,'')+'\'}}
-      ,@{n='FileCount';e={$_.Count}}
-    )
-    "$((Get-Date).ToString($df)) STOP WEB SITE"
-    Stop-WebSite -Name $WEB_SITE -Passthru | ft Id,Name,State
-    Stop-WebAppPool -Name $APP_POOL -Passthru | ft Name,State
-    "$((Get-Date).ToString($df)) COPY FILES"
-    try {Copy-Item -Force -Recurse -Path "$LOCATION\bin\Debug\net7.0-windows\*" -Destination "$APP_PATH" -Exclude @('appsettings.json','web.config')} catch {Write-Warning $_.Exception}
-    try {Copy-Item -Force -Recurse -Path "$LOCATION\wwwroot\*" -Destination "$APP_PATH\wwwroot"} catch {Write-Warning $_.Exception}
-    try {Copy-Item -Force -Recurse -Path "$LOCATION\.scripts\*" -Destination "$APP_PATH\.scripts"} catch {Write-Warning $_.Exception}
-    "$((Get-Date).ToString($df)) START WEB SITE"
-    Start-WebAppPool -Name $APP_POOL -Passthru | ft Name,State
-    Start-WebSite -Name $WEB_SITE -Passthru | ft Id,Name,State
-    "$((Get-Date).ToString($df)) END"
+    echo "ok"

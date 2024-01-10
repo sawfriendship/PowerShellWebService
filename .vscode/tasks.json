@@ -1,0 +1,47 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "prepare_wwwroot",
+            "type": "shell",
+            "windows": {"command": "try{New-Item -Type SymbolicLink -Path '${workspaceFolder}\\bin\\Debug\\net7.0-windows\\wwwroot' -Value '${workspaceFolder}\\wwwroot' -ErrorAction Stop}catch{$_.Exception.Message}; Copy-Item -Force -Path 'C:\\Program Files\\PowerShell\\7\\sni.dll' -Destination ${workspaceFolder}\\bin\\Debug\\net7.0-windows\\"
+            }
+        },
+        {
+            "label": "build",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/PowerShellWebService.sln",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary;ForceNoAlign"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "publish",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "publish",
+                "${workspaceFolder}/PowerShellWebService.sln",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary;ForceNoAlign"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "watch",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "watch",
+                "run",
+                "--project",
+                "${workspaceFolder}/PowerShellWebService.sln"
+            ],
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}
