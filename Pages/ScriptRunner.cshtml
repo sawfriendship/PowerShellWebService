@@ -5,7 +5,7 @@
 @inject IConfiguration Configuration
 
 @{
-    ViewData["Title"] = "ScriptRunner";
+    ViewData["Title"] = "TEST! ScriptRunner";
     bool IsDevelopment = Configuration.GetValue("IsDevelopment",false);
     var Query = Request.Query.ToDictionary(x => x.Key.ToString().ToLower(), x => x.Value.ToString());
     string PwShUrl = Configuration.GetValue("PwShUrl","api")!;
