@@ -65,7 +65,7 @@ job-test-scripts:
   environment: production
   rules:
     - changes:
-        - .scripts/**
+        - .scripts/*
   script: |
     $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
     $config.test.servers | % {Copy-Item -Path "$pwd\.scripts" -Destination $_.path.remote -Recurse -Force}
@@ -76,7 +76,7 @@ job-prod-scripts:
   environment: production
   rules:
     - changes:
-        - .scripts/**
+        - .scripts/*
   script: |
     $config = Get-Content -Raw -Path "$pwd\.deploy_config.json" | ConvertFrom-Json
         $config.test.servers | % {Copy-Item -Path "$pwd\.scripts" -Destination $_.path.remote -Recurse -Force}

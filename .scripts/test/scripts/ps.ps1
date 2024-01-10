@@ -2,7 +2,7 @@ param(
     [string]$Name = '*',
     [int]$Limit = 5
 )
-1
+2
 $ps = ps -Name $Name | select id,name -f $Limit
 
 if ($__FORMAT__ -eq 'json') {
